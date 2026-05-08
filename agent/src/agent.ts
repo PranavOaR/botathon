@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { CONFIG } from './config';
-import { createSession, upsertFileRecord, addLineRange, getFilesRead } from './memory/sessionStore';
+import { createSession, getFilesRead } from './memory/sessionStore';
 import { toolSchemas, dispatchTool } from './tools/index';
 import type { SessionState, AgentEvent, AgentResponse } from './types';
 
@@ -14,9 +14,9 @@ Your philosophy:
 5. BUILD understanding incrementally — summarize files you read, cache them
 
 Tool usage rules:
+- "/" and "." both refer to the project root — use them interchangeably
+- Paths are always relative to the project root: "src/utils/jwt.ts" not "/repo/src/utils/jwt.ts"
 - Never read a file you haven't seen in the tree first
-- Prefer grep() over reading whole files when searching for patterns
-- When you read a file, note what it exports and what it imports
 - Always cite which files and line numbers your answer comes from
 - If you don't know, say "I need to check X first" and use a tool
 
@@ -45,9 +45,7 @@ export class FileMindAgent {
   }
 
   async run(userQuery: string): Promise<AgentResponse> {
-    const messages: Anthropic.MessageParam[] = [
-      { role: 'user', content: userQuery },
-    ];
+    const messages: Anthropic.MessageParam[] = [{ role: 'user', content: userQuery }];
 
     const navigationTrace: AgentResponse['navigationTrace'] = [];
     let iterationCount = 0;
@@ -76,7 +74,9 @@ export class FileMindAgent {
       messages.push({ role: 'assistant', content: response.content });
 
       if (response.stop_reason === 'end_turn') {
-        const textBlock = response.content.find((b): b is Anthropic.TextBlock => b.type === 'text');
+        const textBlock = response.content.find(
+          (b): b is Anthropic.TextBlock => b.type === 'text'
+        );
         finalAnswer = textBlock?.text ?? '';
         this.emit({ type: 'final', content: finalAnswer });
         break;
@@ -90,13 +90,13 @@ export class FileMindAgent {
 
           const input = block.input as Record<string, unknown>;
 
-          // Detect repeated identical tool calls (loop guard)
+          // Loop guard — identical call seen before
           const callKey = `${block.name}:${JSON.stringify(input)}`;
           if (seenToolCalls.has(callKey)) {
             toolResultBlocks.push({
               type: 'tool_result',
               tool_use_id: block.id,
-              content: `You already called ${block.name} with these exact inputs. The result was the same. Try a different approach.`,
+              content: `You already called ${block.name} with these exact inputs. Try a different path or approach.`,
             });
             continue;
           }
@@ -104,17 +104,8 @@ export class FileMindAgent {
 
           this.emit({ type: 'tool_call', tool: block.name, input });
 
-          const output = dispatchTool(block.name, input, this.session);
-
-          // Update session for file reads
-          if (block.name === 'read' && output.metadata?.filePath) {
-            const { filePath, imports = [], exports: expts = [] } = output.metadata;
-            const readInput = input as { path: string; start_line?: number; end_line?: number };
-            this.session = upsertFileRecord(this.session, filePath, { imports, exports: expts });
-            if (readInput.start_line && readInput.end_line) {
-              this.session = addLineRange(this.session, filePath, readInput.start_line, readInput.end_line);
-            }
-          }
+          const { output, updatedSession } = dispatchTool(block.name, input, this.session);
+          this.session = updatedSession;
 
           const summary = output.content.slice(0, 120).replace(/\n/g, ' ');
           navigationTrace.push({ tool: block.name, input, summary });
@@ -131,18 +122,25 @@ export class FileMindAgent {
         continue;
       }
 
-      // Unexpected stop reason
-      finalAnswer = `Agent stopped unexpectedly (stop_reason: ${response.stop_reason}). Check tool definitions.`;
+      finalAnswer = `Agent stopped unexpectedly (stop_reason: ${response.stop_reason}).`;
       break;
     }
 
     if (iterationCount >= CONFIG.maxIterations && !finalAnswer) {
-      const lastAssistant = messages.findLast(
-        (m): m is Anthropic.MessageParam & { role: 'assistant' } => m.role === 'assistant'
-      );
-      const lastText = Array.isArray(lastAssistant?.content)
-        ? lastAssistant.content.find((b): b is Anthropic.TextBlock => b.type === 'text')?.text
-        : undefined;
+      // Walk backwards for the last assistant text block (replaces Array.findLast)
+      let lastText: string | undefined;
+      for (let i = messages.length - 1; i >= 0; i--) {
+        const msg = messages[i];
+        if (msg && msg.role === 'assistant' && Array.isArray(msg.content)) {
+          const textBlock = msg.content.find(
+            (b): b is Anthropic.TextBlock => typeof b === 'object' && b !== null && 'type' in b && b.type === 'text'
+          );
+          if (textBlock) {
+            lastText = textBlock.text;
+            break;
+          }
+        }
+      }
       finalAnswer = `Explored ${CONFIG.maxIterations} steps without a complete answer. Here's what I found so far:\n\n${lastText ?? 'No partial answer available.'}`;
     }
 

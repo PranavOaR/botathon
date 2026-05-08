@@ -20,9 +20,12 @@ export type ToolName = 'tree' | 'read' | 'grep' | 'jump' | 'summarize' | 'fetch_
 export interface ToolOutput {
   content: string;
   metadata?: {
+    /** Display path (relative to target root) — used as session key */
     filePath?: string;
     imports?: string[];
     exports?: string[];
+    /** Actual [start, end] line range that was read */
+    lineRange?: [number, number];
   };
 }
 
