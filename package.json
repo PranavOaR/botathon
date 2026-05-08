@@ -1,0 +1,13 @@
+{
+  "name": "filemind",
+  "version": "1.0.0",
+  "description": "Structure-aware codebase navigation agent — Botathon 2026",
+  "private": true,
+  "scripts": {
+    "agent:dev": "cd agent && npm run dev",
+    "agent:build": "cd agent && npm run build",
+    "agent:test": "cd agent && npm test",
+    "frontend:dev": "cd frontend && npm run dev",
+    "dev": "npm run agent:dev"
+  }
+}
