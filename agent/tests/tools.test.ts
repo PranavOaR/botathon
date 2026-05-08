@@ -200,60 +200,60 @@ describe('read tool — path security', () => {
 // ─── dispatchTool session updates ─────────────────────────────────────────────
 
 describe('dispatchTool — session updates after read', () => {
-  it('adds file to session with imports and exports', () => {
+  it('adds file to session with imports and exports', async () => {
     const session = createSession(FIXTURE_DIR);
-    const { updatedSession } = dispatchTool('read', { path: 'src/index.ts' }, session);
+    const { updatedSession } = await dispatchTool('read', { path: 'src/index.ts' }, session);
     const record = getFileRecord(updatedSession, 'src/index.ts');
     expect(record).toBeDefined();
     expect(record?.imports).toContain('./foo');
     expect(record?.exports).toContain('bar');
   });
 
-  it('records [1, totalLines] line range in session when no range specified', () => {
+  it('records [1, totalLines] line range in session when no range specified', async () => {
     const session = createSession(FIXTURE_DIR);
-    const { updatedSession } = dispatchTool('read', { path: 'src/index.ts' }, session);
+    const { updatedSession } = await dispatchTool('read', { path: 'src/index.ts' }, session);
     const record = getFileRecord(updatedSession, 'src/index.ts');
     expect(record?.linesRead[0]?.[0]).toBe(1);
     expect(record?.linesRead[0]?.[1]).toBeGreaterThanOrEqual(5);
   });
 
-  it('records partial range in session when start_line only specified', () => {
+  it('records partial range in session when start_line only specified', async () => {
     const session = createSession(FIXTURE_DIR);
-    const { updatedSession } = dispatchTool('read', { path: 'src/index.ts', start_line: 3 }, session);
+    const { updatedSession } = await dispatchTool('read', { path: 'src/index.ts', start_line: 3 }, session);
     const record = getFileRecord(updatedSession, 'src/index.ts');
     expect(record?.linesRead[0]?.[0]).toBe(3);
   });
 
-  it('records partial range in session when end_line only specified', () => {
+  it('records partial range in session when end_line only specified', async () => {
     const session = createSession(FIXTURE_DIR);
-    const { updatedSession } = dispatchTool('read', { path: 'src/index.ts', end_line: 2 }, session);
+    const { updatedSession } = await dispatchTool('read', { path: 'src/index.ts', end_line: 2 }, session);
     const record = getFileRecord(updatedSession, 'src/index.ts');
     expect(record?.linesRead[0]?.[0]).toBe(1);
     expect(record?.linesRead[0]?.[1]).toBe(2);
   });
 
-  it('adds file to navigationOrder after read', () => {
+  it('adds file to navigationOrder after read', async () => {
     const session = createSession(FIXTURE_DIR);
-    const { updatedSession } = dispatchTool('read', { path: 'src/foo.ts' }, session);
+    const { updatedSession } = await dispatchTool('read', { path: 'src/foo.ts' }, session);
     expect(updatedSession.navigationOrder).toContain('src/foo.ts');
   });
 
-  it('does not update session on access-denied read', () => {
+  it('does not update session on access-denied read', async () => {
     const session = createSession(FIXTURE_DIR);
-    const { updatedSession } = dispatchTool('read', { path: '../../.env' }, session);
+    const { updatedSession } = await dispatchTool('read', { path: '../../.env' }, session);
     expect(updatedSession.navigationOrder).toHaveLength(0);
   });
 
-  it('does not update session for tree calls', () => {
+  it('does not update session for tree calls', async () => {
     const session = createSession(FIXTURE_DIR);
-    const { updatedSession } = dispatchTool('tree', { path: '.' }, session);
+    const { updatedSession } = await dispatchTool('tree', { path: '.' }, session);
     expect(updatedSession.navigationOrder).toHaveLength(0);
     expect(Object.keys(updatedSession.files)).toHaveLength(0);
   });
 
-  it('original session is not mutated', () => {
+  it('original session is not mutated', async () => {
     const session = createSession(FIXTURE_DIR);
-    dispatchTool('read', { path: 'src/index.ts' }, session);
+    await dispatchTool('read', { path: 'src/index.ts' }, session);
     expect(session.navigationOrder).toHaveLength(0); // original unchanged
   });
 });

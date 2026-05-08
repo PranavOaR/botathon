@@ -2,6 +2,8 @@ import Anthropic from '@anthropic-ai/sdk';
 import { CONFIG } from './config';
 import { createSession, getFilesRead } from './memory/sessionStore';
 import { toolSchemas, dispatchTool } from './tools/index';
+import type { ToolDependencies } from './tools/index';
+import { withRetry } from './utils/retry';
 import type { SessionState, AgentEvent, AgentResponse } from './types';
 
 const SYSTEM_PROMPT = `You are FileMind, a structure-aware code navigation agent. You answer questions about codebases by EXPLORING them with tools — never guessing.
@@ -10,14 +12,16 @@ Your philosophy:
 1. START with tree("/") to understand the project shape
 2. INFER intent from folder/file names before reading content
 3. READ selectively — only the files and line ranges relevant to the query
-4. FOLLOW imports manually — when a file you read imports another local file, locate it with tree and read it next
-5. BUILD understanding incrementally — keep track of files and line ranges already read to avoid re-reading
+4. FOLLOW imports — when a file imports another local file, use jump or read to navigate it
+5. SEARCH precisely — use grep to find symbols or patterns across the whole codebase
+6. SUMMARIZE when you need a quick overview of a file without reading every line
+7. BUILD understanding incrementally — avoid re-reading files or re-running identical searches
 
-Available tools: tree, read
+Available tools: tree, read, grep, jump, summarize
 Tool usage rules:
 - "/" and "." both refer to the project root — use them interchangeably
 - Paths are always relative to the project root: "src/utils/jwt.ts" not "/repo/src/utils/jwt.ts"
-- Never read a file you haven't seen in the tree first
+- Never read a file you haven't seen in the tree or found via grep first
 - Always cite which files and line numbers your answer comes from
 - If you don't know, say "I need to check X first" and use a tool
 
@@ -30,11 +34,17 @@ export class FileMindAgent {
   private client: Anthropic;
   private session: SessionState;
   private onEvent?: (event: AgentEvent) => void;
+  private deps: ToolDependencies;
 
-  constructor(targetPath: string, onEvent?: (event: AgentEvent) => void) {
+  constructor(
+    targetPath: string,
+    onEvent?: (event: AgentEvent) => void,
+    deps: ToolDependencies = {}
+  ) {
     this.client = new Anthropic({ apiKey: CONFIG.anthropicApiKey });
     this.session = createSession(targetPath);
     this.onEvent = onEvent;
+    this.deps = deps;
   }
 
   private emit(event: AgentEvent): void {
@@ -58,13 +68,15 @@ export class FileMindAgent {
 
       let response: Anthropic.Message;
       try {
-        response = await this.client.messages.create({
-          model: CONFIG.models.agent,
-          system: SYSTEM_PROMPT,
-          messages,
-          tools: toolSchemas as Anthropic.Tool[],
-          max_tokens: 4096,
-        });
+        response = await withRetry(() =>
+          this.client.messages.create({
+            model: CONFIG.models.agent,
+            system: SYSTEM_PROMPT,
+            messages,
+            tools: toolSchemas as Anthropic.Tool[],
+            max_tokens: 4096,
+          })
+        );
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         this.emit({ type: 'error', error: message });
@@ -105,7 +117,12 @@ export class FileMindAgent {
 
           this.emit({ type: 'tool_call', tool: block.name, input });
 
-          const { output, updatedSession } = dispatchTool(block.name, input, this.session);
+          const { output, updatedSession } = await dispatchTool(
+            block.name,
+            input,
+            this.session,
+            this.deps
+          );
           this.session = updatedSession;
 
           const summary = output.content.slice(0, 120).replace(/\n/g, ' ');
@@ -128,13 +145,13 @@ export class FileMindAgent {
     }
 
     if (iterationCount >= CONFIG.maxIterations && !finalAnswer) {
-      // Walk backwards for the last assistant text block (replaces Array.findLast)
       let lastText: string | undefined;
       for (let i = messages.length - 1; i >= 0; i--) {
         const msg = messages[i];
         if (msg && msg.role === 'assistant' && Array.isArray(msg.content)) {
           const textBlock = msg.content.find(
-            (b): b is Anthropic.TextBlock => typeof b === 'object' && b !== null && 'type' in b && b.type === 'text'
+            (b): b is Anthropic.TextBlock =>
+              typeof b === 'object' && b !== null && 'type' in b && b.type === 'text'
           );
           if (textBlock) {
             lastText = textBlock.text;

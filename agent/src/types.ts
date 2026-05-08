@@ -1,3 +1,5 @@
+import type { ImportGraph } from './memory/importGraph';
+
 export interface FileRecord {
   path: string;
   summary?: string;
@@ -12,10 +14,11 @@ export interface SessionState {
   targetPath: string;
   files: Record<string, FileRecord>;
   navigationOrder: string[];
+  importGraph: ImportGraph;
   startTime: number;
 }
 
-export type ToolName = 'tree' | 'read' | 'grep' | 'jump' | 'summarize' | 'fetch_remote_file';
+export type ToolName = 'tree' | 'read' | 'grep' | 'jump' | 'summarize';
 
 export interface ToolOutput {
   content: string;

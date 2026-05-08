@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { createImportGraph } from './importGraph';
 import type { FileRecord, SessionState } from '../types';
 
 export function createSession(targetPath: string): SessionState {
@@ -7,6 +8,7 @@ export function createSession(targetPath: string): SessionState {
     targetPath,
     files: {},
     navigationOrder: [],
+    importGraph: createImportGraph(),
     startTime: Date.now(),
   };
 }
