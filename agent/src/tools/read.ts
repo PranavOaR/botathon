@@ -67,6 +67,40 @@ function formatLines(lines: string[], startAt: number): string {
   return lines.map((line, i) => `${String(startAt + i).padStart(6)} | ${line}`).join('\n');
 }
 
+/**
+ * Produces a valid [startLine, endLine] pair within [1, totalLines].
+ * Rules:
+ *   - Values are floored (non-integers handled deterministically).
+ *   - Each bound is clamped to [1, totalLines].
+ *   - Omitted start → 1; omitted end → totalLines.
+ *   - If clamped end < clamped start, end is set to start.
+ */
+function clampLineRange(
+  totalLines: number,
+  start: number | undefined,
+  end: number | undefined
+): [number, number] {
+  const maxLine = Math.max(1, totalLines);
+
+  let startLine: number;
+  if (start !== undefined) {
+    startLine = Math.min(Math.max(Math.floor(start), 1), maxLine);
+  } else {
+    startLine = 1;
+  }
+
+  let endLine: number;
+  if (end !== undefined) {
+    endLine = Math.min(Math.max(Math.floor(end), 1), maxLine);
+  } else {
+    endLine = maxLine;
+  }
+
+  if (endLine < startLine) endLine = startLine;
+
+  return [startLine, endLine];
+}
+
 export function readHandler(input: ReadInput, targetPath: string): ToolOutput {
   const resolved = resolveWithinTarget(targetPath, input.path);
   if (!resolved.ok) {
@@ -108,9 +142,7 @@ export function readHandler(input: ReadInput, targetPath: string): ToolOutput {
     };
   }
 
-  // Compute actual range, clamping to file bounds
-  const startLine = Math.max(1, input.start_line ?? 1);
-  const endLine = Math.min(totalLines, input.end_line ?? totalLines);
+  const [startLine, endLine] = clampLineRange(totalLines, input.start_line, input.end_line);
 
   const slice = allLines.slice(startLine - 1, endLine);
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { writeFileSync, mkdirSync, rmSync } from 'fs';
+import { writeFileSync, mkdirSync, rmSync, symlinkSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { treeHandler } from '../src/tools/tree';
 import { readHandler } from '../src/tools/read';
@@ -255,5 +255,81 @@ describe('dispatchTool — session updates after read', () => {
     const session = createSession(FIXTURE_DIR);
     dispatchTool('read', { path: 'src/index.ts' }, session);
     expect(session.navigationOrder).toHaveLength(0); // original unchanged
+  });
+});
+
+// ─── symlink escape prevention ────────────────────────────────────────────────
+
+describe('symlink escape prevention', () => {
+  const fileSymlink = join(FIXTURE_DIR, 'passwd-link');
+  const dirSymlink = join(FIXTURE_DIR, 'tmp-link');
+
+  beforeAll(() => {
+    try { symlinkSync('/etc/passwd', fileSymlink); } catch { /* skip if unsupported */ }
+    try { symlinkSync('/tmp', dirSymlink); } catch { /* skip if unsupported */ }
+  });
+
+  afterAll(() => {
+    try { unlinkSync(fileSymlink); } catch { /* ignore */ }
+    try { unlinkSync(dirSymlink); } catch { /* ignore */ }
+  });
+
+  it('read blocks a file symlink pointing outside targetPath', () => {
+    const result = readHandler({ path: 'passwd-link' }, FIXTURE_DIR);
+    expect(result.content).toContain('Access denied');
+    expect(result.metadata).toBeUndefined();
+  });
+
+  it('tree blocks a directory symlink pointing outside targetPath', () => {
+    const result = treeHandler({ path: 'tmp-link' }, FIXTURE_DIR);
+    expect(result.content).toContain('Access denied');
+  });
+
+  it('read returns "File not found" for genuinely missing files — not "Access denied"', () => {
+    const result = readHandler({ path: 'genuinely-missing.ts' }, FIXTURE_DIR);
+    expect(result.content).toContain('File not found');
+    expect(result.content).not.toContain('Access denied');
+  });
+
+  it('read still works for normal files after symlinks are present in the fixture', () => {
+    const result = readHandler({ path: 'src/index.ts' }, FIXTURE_DIR);
+    expect(result.content).toContain('import');
+    expect(result.content).not.toContain('Access denied');
+  });
+});
+
+// ─── read tool — line range clamping ──────────────────────────────────────────
+
+describe('read tool — line range clamping', () => {
+  // src/index.ts has 5 lines
+
+  it('clamps start_line > totalLines to [totalLines, totalLines]', () => {
+    const result = readHandler({ path: 'src/index.ts', start_line: 9999 }, FIXTURE_DIR);
+    const [start, end] = result.metadata!.lineRange!;
+    expect(start).toBeGreaterThanOrEqual(1);
+    expect(end).toBe(start); // both clamped to totalLines
+  });
+
+  it('clamps end_line < 1 to [1, 1]', () => {
+    const result = readHandler({ path: 'src/index.ts', end_line: -5 }, FIXTURE_DIR);
+    expect(result.metadata?.lineRange).toEqual([1, 1]);
+  });
+
+  it('clamps start > end to [start, start] after individual clamping', () => {
+    const result = readHandler({ path: 'src/index.ts', start_line: 3, end_line: 1 }, FIXTURE_DIR);
+    const [start, end] = result.metadata!.lineRange!;
+    expect(start).toBeGreaterThanOrEqual(1);
+    expect(end).toBe(start); // deterministic: end elevated to start
+  });
+
+  it('floors non-integer line numbers', () => {
+    const result = readHandler({ path: 'src/index.ts', start_line: 1.9, end_line: 2.7 }, FIXTURE_DIR);
+    expect(result.metadata?.lineRange).toEqual([1, 2]);
+  });
+
+  it('displayed header matches the actual clamped range', () => {
+    const result = readHandler({ path: 'src/index.ts', start_line: 9999 }, FIXTURE_DIR);
+    const [start, end] = result.metadata!.lineRange!;
+    expect(result.content).toContain(`lines ${start}-${end}`);
   });
 });
