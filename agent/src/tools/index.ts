@@ -7,6 +7,7 @@ import type { ToolDependencies } from './summarize';
 import { upsertFileRecord, addLineRange, getSummary } from '../memory/sessionStore';
 import { addEdge } from '../memory/importGraph';
 import { resolveLocalImport } from './importResolver';
+import { resolveWithinTarget } from './pathUtils';
 import type { SessionState, ToolOutput } from '../types';
 
 export type { ToolDependencies };
@@ -43,7 +44,7 @@ export async function dispatchTool(
         const { filePath, imports = [], exports: expts = [], lineRange } = output.metadata;
         updatedSession = upsertFileRecord(updatedSession, filePath, { imports, exports: expts });
 
-        // Wire importGraph edges for all resolved local imports
+        // Wire importGraph edges for resolved local imports
         let graph = updatedSession.importGraph;
         for (const rawImport of imports) {
           const resolved = resolveLocalImport(filePath, rawImport, session.targetPath);
@@ -71,19 +72,34 @@ export async function dispatchTool(
     case 'jump': {
       const output = jumpHandler(
         input as unknown as Parameters<typeof jumpHandler>[0],
-        session.targetPath
+        session.targetPath,
+        session.importGraph
       );
       return { output, updatedSession: session };
     }
 
     case 'summarize': {
-      const summarizeInput = input as unknown as Parameters<typeof summarizeHandler>[0];
-      const cached = getSummary(session, summarizeInput.path);
-      const result = await summarizeHandler(summarizeInput, session.targetPath, cached, deps);
+      // Resolve path up front so cache key is always the display path
+      const rawPath = (input['path'] as string) ?? '';
+      const resolved = resolveWithinTarget(session.targetPath, rawPath);
+      if (!resolved.ok) {
+        return {
+          output: { content: `Access denied: path is outside the target directory.` },
+          updatedSession: session,
+        };
+      }
+
+      const cached = getSummary(session, resolved.displayPath);
+      const result = await summarizeHandler(
+        resolved.displayPath,
+        session.targetPath,
+        cached,
+        deps
+      );
 
       let updatedSession = session;
-      if (result.summary !== undefined && result.metadata?.filePath) {
-        updatedSession = upsertFileRecord(updatedSession, result.metadata.filePath, {
+      if (result.summary !== undefined) {
+        updatedSession = upsertFileRecord(updatedSession, resolved.displayPath, {
           summary: result.summary,
         });
       }

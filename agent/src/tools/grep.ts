@@ -1,37 +1,43 @@
 import fs from 'fs';
 import path from 'path';
 import { resolveWithinTarget } from './pathUtils';
+import { CONFIG } from '../config';
 import type { ToolOutput } from '../types';
 
 export interface GrepInput {
   pattern: string;
-  path?: string;
-  file_pattern?: string;
-  max_results?: number;
+  directory?: string;       // default "."
+  file_extension?: string;  // e.g. ".ts", ".py"
+  case_sensitive?: boolean; // default false
+  max_results?: number;     // default 30, max 100
 }
 
 export const grepTool = {
   name: 'grep',
   description:
-    'Search for a regex pattern across files in the codebase. Returns matching lines with file paths and line numbers.',
+    'Search for a pattern across files in the codebase. Returns matching lines with file paths and line numbers. Defaults to case-insensitive search.',
   input_schema: {
     type: 'object' as const,
     properties: {
       pattern: {
         type: 'string',
-        description: 'Regular expression pattern to search for',
+        description: 'Search pattern (regex, falls back to literal if invalid regex)',
       },
-      path: {
+      directory: {
         type: 'string',
-        description: 'Directory or file to search within (default: project root)',
+        description: 'Directory to search within (default: project root ".")',
       },
-      file_pattern: {
+      file_extension: {
         type: 'string',
-        description: 'Glob-style filter on filenames, e.g. "*.ts" (default: all files)',
+        description: 'Only search files with this extension, e.g. ".ts" or ".py"',
+      },
+      case_sensitive: {
+        type: 'boolean',
+        description: 'Whether the search is case-sensitive (default: false)',
       },
       max_results: {
         type: 'number',
-        description: 'Maximum number of matching lines to return (default: 50)',
+        description: 'Maximum number of matching lines to return (default: 30, max: 100)',
       },
     },
     required: ['pattern'],
@@ -39,49 +45,72 @@ export const grepTool = {
 };
 
 const SKIP_DIRS = new Set(['node_modules', '.git', '.next', 'dist', 'build', '__pycache__']);
-const MAX_FILE_SIZE_BYTES = 512 * 1024;
-const DEFAULT_MAX_RESULTS = 50;
+const DEFAULT_MAX_RESULTS = 30;
+const MAX_RESULTS_CEILING = 100;
+
+type Matcher = (line: string) => boolean;
+
+function buildMatcher(pattern: string, caseSensitive: boolean): Matcher {
+  const flags = caseSensitive ? '' : 'i';
+  try {
+    const regex = new RegExp(pattern, flags);
+    return (line: string) => regex.test(line);
+  } catch {
+    // Fallback: literal string search
+    const needle = caseSensitive ? pattern : pattern.toLowerCase();
+    return (line: string) => (caseSensitive ? line : line.toLowerCase()).includes(needle);
+  }
+}
 
 export function grepHandler(input: GrepInput, targetPath: string): ToolOutput {
-  const searchPath = input.path ?? '.';
-  const resolved = resolveWithinTarget(targetPath, searchPath);
+  const dir = input.directory ?? '.';
+  const resolved = resolveWithinTarget(targetPath, dir);
 
   if (!resolved.ok) {
-    return { content: `Access denied: path is outside the target directory.` };
+    return { content: `Access denied: directory is outside the target repository.` };
   }
 
   if (!fs.existsSync(resolved.absolutePath)) {
-    return { content: `Path not found: "${searchPath}"` };
+    return { content: `Directory not found: "${dir}"` };
   }
 
-  let regex: RegExp;
-  try {
-    regex = new RegExp(input.pattern);
-  } catch {
-    return { content: `Invalid regex pattern: "${input.pattern}"` };
+  const stat = fs.statSync(resolved.absolutePath);
+  if (!stat.isDirectory()) {
+    return { content: `"${dir}" is a file, not a directory. Use a directory path.` };
   }
 
-  const fileFilter = input.file_pattern ? buildFileFilter(input.file_pattern) : null;
-  const maxResults = input.max_results ?? DEFAULT_MAX_RESULTS;
+  const caseSensitive = input.case_sensitive ?? false;
+  const maxResults = Math.min(input.max_results ?? DEFAULT_MAX_RESULTS, MAX_RESULTS_CEILING);
+  const matcher = buildMatcher(input.pattern, caseSensitive);
+
+  // Normalize extension: accept "ts" or ".ts"
+  let ext: string | undefined;
+  if (input.file_extension) {
+    ext = input.file_extension.startsWith('.') ? input.file_extension : `.${input.file_extension}`;
+  }
+
   const matches: string[] = [];
+  searchDir(resolved.absolutePath, targetPath, matcher, ext ?? null, maxResults, matches);
 
-  searchDir(resolved.absolutePath, targetPath, regex, fileFilter, maxResults, matches);
+  const dirDisplay = resolved.displayPath === '.' ? '.' : resolved.displayPath;
 
   if (matches.length === 0) {
-    return { content: `No matches found for pattern: ${input.pattern}` };
+    return { content: `No matches for "${input.pattern}" under ${dirDisplay}.` };
   }
 
   const truncated = matches.length >= maxResults;
-  const lines = matches.slice(0, maxResults);
-  const header = `Found ${lines.length}${truncated ? '+' : ''} match(es) for /${input.pattern}/:\n`;
-  return { content: header + lines.join('\n') };
+  const header = `Found ${matches.length}${truncated ? '+' : ''} result(s) for "${input.pattern}":\n`;
+  const footer = truncated
+    ? `\nShowing first ${maxResults} results. Refine pattern or directory to narrow the search.`
+    : '';
+  return { content: header + '\n' + matches.join('\n') + footer };
 }
 
 function searchDir(
   dirPath: string,
   targetRoot: string,
-  regex: RegExp,
-  fileFilter: ((name: string) => boolean) | null,
+  matcher: Matcher,
+  ext: string | null,
   maxResults: number,
   matches: string[]
 ): void {
@@ -101,11 +130,13 @@ function searchDir(
     const fullPath = path.join(dirPath, entry.name);
 
     if (entry.isDirectory()) {
-      if (SKIP_DIRS.has(entry.name)) continue;
-      searchDir(fullPath, targetRoot, regex, fileFilter, maxResults, matches);
+      if (SKIP_DIRS.has(entry.name) || entry.name.startsWith('.')) continue;
+      searchDir(fullPath, targetRoot, matcher, ext, maxResults, matches);
     } else if (entry.isFile()) {
-      if (fileFilter && !fileFilter(entry.name)) continue;
-      searchFile(fullPath, targetRoot, regex, maxResults, matches);
+      const fileExt = path.extname(entry.name);
+      if (CONFIG.binaryExtensions.has(fileExt)) continue;
+      if (ext !== null && fileExt !== ext) continue;
+      searchFile(fullPath, targetRoot, matcher, maxResults, matches);
     }
   }
 }
@@ -113,13 +144,13 @@ function searchDir(
 function searchFile(
   filePath: string,
   targetRoot: string,
-  regex: RegExp,
+  matcher: Matcher,
   maxResults: number,
   matches: string[]
 ): void {
   try {
     const stat = fs.statSync(filePath);
-    if (stat.size > MAX_FILE_SIZE_BYTES) return;
+    if (stat.size > CONFIG.maxFileSizeKb * 1024) return;
 
     const content = fs.readFileSync(filePath, 'utf8');
     const displayPath = path.relative(targetRoot, filePath);
@@ -128,22 +159,11 @@ function searchFile(
     for (let i = 0; i < lines.length; i++) {
       if (matches.length >= maxResults) return;
       const line = lines[i] ?? '';
-      if (regex.test(line)) {
-        const lineNum = String(i + 1).padStart(4, ' ');
-        matches.push(`${displayPath}:${lineNum} | ${line}`);
+      if (matcher(line)) {
+        matches.push(`${displayPath}:${i + 1}: ${line}`);
       }
     }
   } catch {
     // skip unreadable files
   }
-}
-
-function buildFileFilter(pattern: string): (name: string) => boolean {
-  // Convert glob-style pattern to regex: "*.ts" → /^.*\.ts$/
-  const escaped = pattern
-    .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-    .replace(/\*/g, '.*')
-    .replace(/\?/g, '.');
-  const regex = new RegExp(`^${escaped}$`);
-  return (name: string) => regex.test(name);
 }

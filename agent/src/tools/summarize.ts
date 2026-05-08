@@ -1,10 +1,5 @@
-import fs from 'fs';
-import { resolveWithinTarget } from './pathUtils';
+import { readHandler } from './read';
 import type { ToolOutput } from '../types';
-
-export interface SummarizeInput {
-  path: string;
-}
 
 export interface ToolDependencies {
   summarizeFile?: (content: string) => Promise<string>;
@@ -13,7 +8,7 @@ export interface ToolDependencies {
 export const summarizeTool = {
   name: 'summarize',
   description:
-    'Produce a concise natural-language summary of a file. Useful for quickly understanding what a file does without reading every line.',
+    'Produce a concise natural-language summary of a file. Uses the first 150 lines. Returns cached result if the file was already summarized this session.',
   input_schema: {
     type: 'object' as const,
     properties: {
@@ -26,48 +21,38 @@ export const summarizeTool = {
   },
 };
 
-const MAX_FILE_SIZE_BYTES = 512 * 1024;
-
+/**
+ * Summarize a file.
+ *
+ * @param displayPath - Already-resolved display path (repo-relative). Path resolution and
+ *   cache lookup must be done by the caller before invoking this function.
+ * @param targetPath  - Absolute root of the target repository.
+ * @param cachedSummary - Existing summary from session, if any.
+ * @param deps - Injected summarizer; required in production, injectable for tests.
+ */
 export async function summarizeHandler(
-  input: SummarizeInput,
+  displayPath: string,
   targetPath: string,
   cachedSummary: string | undefined,
   deps: ToolDependencies
 ): Promise<ToolOutput & { summary: string | undefined }> {
-  if (cachedSummary) {
+  if (cachedSummary !== undefined) {
     return {
-      content: `Summary of ${input.path}:\n\n${cachedSummary}`,
+      content: `Summary of ${displayPath} [cached]:\n\n${cachedSummary}`,
       summary: cachedSummary,
-      metadata: { filePath: input.path },
+      metadata: { filePath: displayPath },
     };
   }
 
-  const resolved = resolveWithinTarget(targetPath, input.path);
-  if (!resolved.ok) {
-    return {
-      content: `Access denied: path is outside the target directory.`,
-      summary: undefined,
-    };
-  }
+  // Read first 150 lines via readHandler (re-uses path security + line logic)
+  const readResult = readHandler(
+    { path: displayPath, start_line: 1, end_line: 150 },
+    targetPath
+  );
 
-  if (!fs.existsSync(resolved.absolutePath)) {
-    return { content: `File not found: "${input.path}"`, summary: undefined };
-  }
-
-  const stat = fs.statSync(resolved.absolutePath);
-  if (stat.isDirectory()) {
-    return { content: `"${input.path}" is a directory, not a file.`, summary: undefined };
-  }
-
-  if (stat.size > MAX_FILE_SIZE_BYTES) {
-    return { content: `File too large to summarize: "${input.path}"`, summary: undefined };
-  }
-
-  let fileContent: string;
-  try {
-    fileContent = fs.readFileSync(resolved.absolutePath, 'utf8');
-  } catch {
-    return { content: `Could not read file: "${input.path}"`, summary: undefined };
+  if (!readResult.metadata?.filePath) {
+    // readHandler returned an error (access denied, file not found, etc.)
+    return { content: readResult.content, summary: undefined };
   }
 
   if (!deps.summarizeFile) {
@@ -77,10 +62,10 @@ export async function summarizeHandler(
     };
   }
 
-  const summary = await deps.summarizeFile(fileContent);
+  const summary = await deps.summarizeFile(readResult.content);
   return {
-    content: `Summary of ${input.path}:\n\n${summary}`,
+    content: `Summary of ${displayPath}:\n\n${summary}`,
     summary,
-    metadata: { filePath: resolved.displayPath },
+    metadata: { filePath: displayPath },
   };
 }

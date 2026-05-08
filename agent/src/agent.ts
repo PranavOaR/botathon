@@ -44,7 +44,32 @@ export class FileMindAgent {
     this.client = new Anthropic({ apiKey: CONFIG.anthropicApiKey });
     this.session = createSession(targetPath);
     this.onEvent = onEvent;
-    this.deps = deps;
+    this.deps = { ...this.createDefaultToolDeps(), ...deps };
+  }
+
+  private createDefaultToolDeps(): ToolDependencies {
+    return {
+      summarizeFile: async (content: string) => {
+        const response = await withRetry(() =>
+          this.client.messages.create({
+            model: CONFIG.models.summarizer,
+            max_tokens: 512,
+            messages: [
+              {
+                role: 'user',
+                content:
+                  `Summarize this file in 3-5 sentences. Cover: what it does, what it exports, ` +
+                  `and any notable dependencies. Be specific.\n\n${content}`,
+              },
+            ],
+          })
+        );
+        const textBlock = response.content.find(
+          (b): b is Anthropic.TextBlock => b.type === 'text'
+        );
+        return textBlock?.text.trim() ?? 'No summary returned.';
+      },
+    };
   }
 
   private emit(event: AgentEvent): void {

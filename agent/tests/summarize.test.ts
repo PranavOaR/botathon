@@ -19,100 +19,112 @@ afterAll(() => {
   rmSync(FIXTURE_DIR, { recursive: true, force: true });
 });
 
+// ─── summarizeHandler — direct unit tests ─────────────────────────────────────
+
 describe('summarizeHandler — basic behaviour', () => {
   it('calls summarizeFile with file content and returns the summary', async () => {
     const summarizeFile = vi.fn().mockResolvedValue('This file exports verifyToken.');
-    const result = await summarizeHandler(
-      { path: 'src/auth.ts' },
-      FIXTURE_DIR,
-      undefined,
-      { summarizeFile }
-    );
+    const result = await summarizeHandler('src/auth.ts', FIXTURE_DIR, undefined, { summarizeFile });
     expect(summarizeFile).toHaveBeenCalledOnce();
     expect(result.content).toContain('This file exports verifyToken.');
     expect(result.summary).toBe('This file exports verifyToken.');
   });
 
-  it('returns the cached summary without calling summarizeFile', async () => {
+  it('returns cached summary without calling summarizeFile', async () => {
     const summarizeFile = vi.fn();
-    const result = await summarizeHandler(
-      { path: 'src/auth.ts' },
-      FIXTURE_DIR,
-      'cached summary',
-      { summarizeFile }
-    );
+    const result = await summarizeHandler('src/auth.ts', FIXTURE_DIR, 'cached text', {
+      summarizeFile,
+    });
     expect(summarizeFile).not.toHaveBeenCalled();
-    expect(result.content).toContain('cached summary');
+    expect(result.content).toContain('cached text');
   });
 
-  it('returns error for a missing file', async () => {
+  it('cached output includes [cached] tag', async () => {
     const summarizeFile = vi.fn();
-    const result = await summarizeHandler(
-      { path: 'nonexistent.ts' },
-      FIXTURE_DIR,
-      undefined,
-      { summarizeFile }
-    );
-    expect(result.content).toContain('not found');
-    expect(summarizeFile).not.toHaveBeenCalled();
+    const result = await summarizeHandler('src/auth.ts', FIXTURE_DIR, 'cached text', {
+      summarizeFile,
+    });
+    expect(result.content).toContain('[cached]');
   });
 
-  it('returns error for path traversal', async () => {
+  it('returns error for a missing file without calling summarizeFile', async () => {
     const summarizeFile = vi.fn();
-    const result = await summarizeHandler(
-      { path: '../../etc/passwd' },
-      FIXTURE_DIR,
-      undefined,
-      { summarizeFile }
-    );
-    expect(result.content).toContain('Access denied');
+    const result = await summarizeHandler('nonexistent.ts', FIXTURE_DIR, undefined, {
+      summarizeFile,
+    });
+    expect(result.content).toMatch(/not found|not a file/i);
     expect(summarizeFile).not.toHaveBeenCalled();
   });
 
   it('returns fallback when no summarizeFile dep is provided', async () => {
-    const result = await summarizeHandler(
-      { path: 'src/auth.ts' },
-      FIXTURE_DIR,
-      undefined,
-      {}
-    );
+    const result = await summarizeHandler('src/auth.ts', FIXTURE_DIR, undefined, {});
     expect(result.content).toContain('not available');
   });
 });
 
-describe('dispatchTool — summarize integration', () => {
-  it('stores the returned summary in the session', async () => {
-    const session = createSession(FIXTURE_DIR);
+// ─── dispatchTool — summarize integration ─────────────────────────────────────
+
+describe('dispatchTool — summarize cache semantics', () => {
+  it('first call invokes summarizeFile and stores summary in session', async () => {
     const summarizeFile = vi.fn().mockResolvedValue('auth file summary');
-    const { updatedSession } = await dispatchTool(
-      'summarize',
-      { path: 'src/auth.ts' },
-      session,
-      { summarizeFile }
-    );
+    const session = createSession(FIXTURE_DIR);
+    const { updatedSession } = await dispatchTool('summarize', { path: 'src/auth.ts' }, session, {
+      summarizeFile,
+    });
     const record = getFileRecord(updatedSession, 'src/auth.ts');
     expect(record?.summary).toBe('auth file summary');
+    expect(summarizeFile).toHaveBeenCalledTimes(1);
   });
 
-  it('uses cached summary from session on second call', async () => {
-    const session = createSession(FIXTURE_DIR);
+  it('second call with same relative path returns [cached] without re-calling summarizeFile', async () => {
     const summarizeFile = vi.fn().mockResolvedValue('auth file summary');
+    const session = createSession(FIXTURE_DIR);
 
-    const { updatedSession: s1 } = await dispatchTool(
-      'summarize',
-      { path: 'src/auth.ts' },
-      session,
-      { summarizeFile }
-    );
+    const { updatedSession: s1 } = await dispatchTool('summarize', { path: 'src/auth.ts' }, session, {
+      summarizeFile,
+    });
+    const { output: out2 } = await dispatchTool('summarize', { path: 'src/auth.ts' }, s1, {
+      summarizeFile,
+    });
 
-    const { updatedSession: s2 } = await dispatchTool(
-      'summarize',
-      { path: 'src/auth.ts' },
-      s1,
-      { summarizeFile }
-    );
+    expect(summarizeFile).toHaveBeenCalledTimes(1);
+    expect(out2.content).toContain('[cached]');
+  });
 
-    expect(summarizeFile).toHaveBeenCalledTimes(1); // not called again
-    expect(getFileRecord(s2, 'src/auth.ts')?.summary).toBe('auth file summary');
+  it('second call with absolute path inside target also returns [cached]', async () => {
+    const summarizeFile = vi.fn().mockResolvedValue('auth file summary');
+    const session = createSession(FIXTURE_DIR);
+
+    const { updatedSession: s1 } = await dispatchTool('summarize', { path: 'src/auth.ts' }, session, {
+      summarizeFile,
+    });
+
+    const absolutePath = join(FIXTURE_DIR, 'src', 'auth.ts');
+    const { output: out2 } = await dispatchTool('summarize', { path: absolutePath }, s1, {
+      summarizeFile,
+    });
+
+    expect(summarizeFile).toHaveBeenCalledTimes(1);
+    expect(out2.content).toContain('[cached]');
+  });
+
+  it('access-denied path does not call summarizeFile', async () => {
+    const summarizeFile = vi.fn();
+    const session = createSession(FIXTURE_DIR);
+    const { output } = await dispatchTool('summarize', { path: '../../etc/passwd' }, session, {
+      summarizeFile,
+    });
+    expect(output.content).toContain('Access denied');
+    expect(summarizeFile).not.toHaveBeenCalled();
+  });
+
+  it('missing file does not call summarizeFile', async () => {
+    const summarizeFile = vi.fn();
+    const session = createSession(FIXTURE_DIR);
+    const { output } = await dispatchTool('summarize', { path: 'src/missing.ts' }, session, {
+      summarizeFile,
+    });
+    expect(output.content).toMatch(/not found|File not found/i);
+    expect(summarizeFile).not.toHaveBeenCalled();
   });
 });
