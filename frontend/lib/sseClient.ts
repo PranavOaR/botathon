@@ -25,6 +25,7 @@ export function streamQuery(options: StreamQueryOptions): { close: () => void } 
   const url = `${baseUrl}/query/stream?${params.toString()}`;
 
   const source = new EventSource(url);
+  let completed = false;
 
   source.onopen = () => {
     onOpen?.();
@@ -33,6 +34,9 @@ export function streamQuery(options: StreamQueryOptions): { close: () => void } 
   source.onmessage = (messageEvent) => {
     try {
       const parsed: AgentEvent = JSON.parse(messageEvent.data);
+      if (parsed.type === 'done') {
+        completed = true;
+      }
       onEvent(parsed);
     } catch {
       onError(new Error(`Failed to parse SSE event: ${messageEvent.data}`));
@@ -42,6 +46,12 @@ export function streamQuery(options: StreamQueryOptions): { close: () => void } 
   };
 
   source.onerror = () => {
+    // EventSource fires onerror on clean server close too — ignore if stream completed normally
+    if (completed) {
+      source.close();
+      onClose?.();
+      return;
+    }
     onError(new Error('SSE connection error'));
     source.close();
     onClose?.();

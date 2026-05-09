@@ -1,64 +1,71 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { Search } from 'lucide-react';
+import { streamQuery } from '@/lib/sseClient';
+import type { AgentEvent } from '@/lib/sseClient';
+import StatusBar from '@/components/StatusBar';
+import LeftRail from '@/components/LeftRail';
 import QueryInput from '@/components/QueryInput';
 import ReasoningTrace from '@/components/ReasoningTrace';
 import AnswerPanel from '@/components/AnswerPanel';
-import { streamQuery, type AgentEvent } from '@/lib/sseClient';
 
-const API_BASE = process.env.NEXT_PUBLIC_FILEMIND_API_URL ?? 'http://localhost:3001';
+const API_URL = process.env.NEXT_PUBLIC_FILEMIND_API_URL ?? 'http://localhost:3001';
 
-type HealthStatus = 'checking' | 'connected' | 'unavailable';
-
-export default function Home() {
+export default function HomePage() {
   const [query, setQuery] = useState('How does authentication work?');
   const [targetPath, setTargetPath] = useState('../demo/sample-repos/nextjs-starter');
   const [events, setEvents] = useState<AgentEvent[]>([]);
   const [answer, setAnswer] = useState<string | null>(null);
+  const [iterationCount, setIterationCount] = useState<number | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [iterationCount, setIterationCount] = useState<number | null>(null);
-  const [health, setHealth] = useState<HealthStatus>('checking');
-
-  const closeRef = useRef<(() => void) | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    setHealth('checking');
-    fetch(`${API_BASE}/health`)
-      .then((res) => {
-        if (!cancelled) setHealth(res.ok ? 'connected' : 'unavailable');
-      })
-      .catch(() => {
-        if (!cancelled) setHealth('unavailable');
-      });
-    return () => { cancelled = true; };
-  }, []);
+  const [backendStatus, setBackendStatus] = useState<'checking' | 'connected' | 'error'>('checking');
+  const [submittedQuery, setSubmittedQuery] = useState<string | null>(null);
+  const streamRef = useRef<{ close: () => void } | null>(null);
+  const feedRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    return () => {
-      closeRef.current?.();
+    const check = async () => {
+      try {
+        const res = await fetch(`${API_URL}/health`);
+        setBackendStatus(res.ok ? 'connected' : 'error');
+      } catch {
+        setBackendStatus('error');
+      }
     };
+    check();
+    const id = setInterval(check, 15_000);
+    return () => clearInterval(id);
   }, []);
+
+  useEffect(() => () => { streamRef.current?.close(); }, []);
+
+  useEffect(() => {
+    if (feedRef.current) {
+      feedRef.current.scrollTop = feedRef.current.scrollHeight;
+    }
+  }, [events.length]);
 
   const handleSubmit = useCallback(() => {
-    if (isRunning || !query.trim() || !targetPath.trim()) return;
+    if (isRunning || !query.trim()) return;
+    streamRef.current?.close();
+    streamRef.current = null;
 
     setEvents([]);
     setAnswer(null);
-    setError(null);
     setIterationCount(null);
+    setError(null);
+    setSubmittedQuery(query.trim());
     setIsRunning(true);
 
-    const handle = streamQuery({
-      baseUrl: API_BASE,
+    const stream = streamQuery({
+      baseUrl: API_URL,
       query: query.trim(),
       targetPath: targetPath.trim(),
-      onEvent(event: AgentEvent) {
-        setEvents((prev) => [...prev, event]);
-        if (event.type === 'final' && event.content) {
-          setAnswer(event.content);
-        }
+      onEvent(event) {
+        setEvents(prev => [...prev, event]);
+        if (event.type === 'final' && event.content) setAnswer(event.content);
         if (event.type === 'done') {
           setIterationCount(event.iterationCount ?? null);
           setIsRunning(false);
@@ -68,44 +75,54 @@ export default function Home() {
           setIsRunning(false);
         }
       },
-      onError(err: Error) {
+      onError(err) {
         setError(err.message);
         setIsRunning(false);
       },
       onClose() {
-        closeRef.current = null;
+        setIsRunning(false);
       },
     });
 
-    closeRef.current = handle.close;
+    streamRef.current = stream;
   }, [isRunning, query, targetPath]);
 
   const handleCancel = useCallback(() => {
-    closeRef.current?.();
-    closeRef.current = null;
+    streamRef.current?.close();
+    streamRef.current = null;
     setIsRunning(false);
   }, []);
 
   return (
-    <div className="app">
-      <header className="topbar">
-        <div className="topbar__brand">
-          <span className="topbar__logo">FM</span>
-          <div className="topbar__text">
-            <h1 className="topbar__title">FileMind</h1>
-            <span className="topbar__subtitle">Structure-aware codebase navigation</span>
-          </div>
-        </div>
-        <div className={`topbar__status topbar__status--${health}`}>
-          <span className="topbar__dot" />
-          {health === 'checking' && 'Checking backend...'}
-          {health === 'connected' && 'Backend connected'}
-          {health === 'unavailable' && 'Backend unavailable'}
-        </div>
-      </header>
-
+    <div className="app-shell">
+      <StatusBar
+        backendStatus={backendStatus}
+        isRunning={isRunning}
+        iterationCount={iterationCount}
+      />
       <div className="workbench">
-        <aside className="workbench__input">
+        <LeftRail targetPath={targetPath} events={events} isRunning={isRunning} />
+        <div className="center-panel">
+          <div className="conversation-feed" ref={feedRef}>
+            {!submittedQuery ? (
+              <div className="feed-empty">
+                <div className="feed-empty__icon">
+                  <Search size={18} />
+                </div>
+                <div className="feed-empty__title">No investigation running</div>
+                <div className="feed-empty__sub">
+                  {'Type a question below and FileMind will\nwalk the file system and cite its path.'}
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="user-bubble">
+                  <div className="user-bubble__content">{submittedQuery}</div>
+                </div>
+                <ReasoningTrace events={events} isRunning={isRunning} />
+              </>
+            )}
+          </div>
           <QueryInput
             query={query}
             targetPath={targetPath}
@@ -115,20 +132,14 @@ export default function Home() {
             onSubmit={handleSubmit}
             onCancel={handleCancel}
           />
-        </aside>
-        <main className="workbench__panels">
-          <div className="workbench__trace">
-            <ReasoningTrace events={events} isRunning={isRunning} />
-          </div>
-          <div className="workbench__answer">
-            <AnswerPanel
-              answer={answer}
-              error={error}
-              iterationCount={iterationCount}
-              isRunning={isRunning}
-            />
-          </div>
-        </main>
+        </div>
+        <AnswerPanel
+          answer={answer}
+          iterationCount={iterationCount}
+          isRunning={isRunning}
+          error={error}
+          events={events}
+        />
       </div>
     </div>
   );

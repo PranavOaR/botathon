@@ -1,11 +1,21 @@
 'use client';
 
+import { useCallback, type KeyboardEvent } from 'react';
+import { motion } from 'framer-motion';
+import { Send, X, FolderOpen } from 'lucide-react';
+
+const EXAMPLES = [
+  'How does authentication work?',
+  'Where is JWT validation implemented?',
+  'What files would I change to add role-based access?',
+];
+
 interface QueryInputProps {
   query: string;
   targetPath: string;
   isRunning: boolean;
-  onQueryChange: (value: string) => void;
-  onTargetPathChange: (value: string) => void;
+  onQueryChange: (q: string) => void;
+  onTargetPathChange: (p: string) => void;
   onSubmit: () => void;
   onCancel: () => void;
 }
@@ -19,67 +29,100 @@ export default function QueryInput({
   onSubmit,
   onCancel,
 }: QueryInputProps) {
-  const canSubmit = query.trim().length > 0 && targetPath.trim().length > 0 && !isRunning;
-
-  function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && canSubmit) {
-      onSubmit();
-    }
-  }
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLTextAreaElement>) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        e.preventDefault();
+        onSubmit();
+      }
+    },
+    [onSubmit]
+  );
 
   return (
-    <div className="query-input">
-      <div className="query-input__field">
-        <label className="query-input__label" htmlFor="target-path">
-          Target repository
+    <div className="composer">
+      {/* Target path row */}
+      <div className="composer__path-row">
+        <label className="composer__path-label" htmlFor="target-path">
+          <FolderOpen size={11} />
+          repo
         </label>
         <input
           id="target-path"
           type="text"
-          className="query-input__path"
+          className="composer__path-input"
           value={targetPath}
-          onChange={(e) => onTargetPathChange(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="/path/to/repo"
+          onChange={e => onTargetPathChange(e.target.value)}
           disabled={isRunning}
           spellCheck={false}
         />
       </div>
-      <div className="query-input__field">
-        <label className="query-input__label" htmlFor="query">
-          Query
-        </label>
-        <textarea
-          id="query"
-          className="query-input__textarea"
-          value={query}
-          onChange={(e) => onQueryChange(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Ask about the codebase..."
-          rows={3}
-          disabled={isRunning}
-          spellCheck={false}
-        />
+
+      {/* Query textarea */}
+      <textarea
+        className="composer__textarea"
+        value={query}
+        onChange={e => onQueryChange(e.target.value)}
+        onKeyDown={handleKeyDown}
+        disabled={isRunning}
+        placeholder="Ask FileMind to investigate this codebase…"
+        rows={3}
+        spellCheck={false}
+      />
+
+      {/* Bottom row */}
+      <div className="composer__bottom">
+        {/* Example prompts */}
+        <div className="composer__examples">
+          {EXAMPLES.map(ex => (
+            <button
+              key={ex}
+              type="button"
+              className="composer__example"
+              onClick={() => onQueryChange(ex)}
+              disabled={isRunning}
+            >
+              {ex.length > 38 ? ex.slice(0, 36) + '…' : ex}
+            </button>
+          ))}
+        </div>
+
+        {/* Actions */}
+        <div className="composer__actions">
+          <span className="composer__shortcut">⌘↩</span>
+
+          {isRunning ? (
+            <motion.button
+              type="button"
+              className="btn btn--cancel"
+              onClick={onCancel}
+              initial={{ opacity: 0, scale: 0.92 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.15 }}
+            >
+              <X size={13} />
+              Cancel
+            </motion.button>
+          ) : (
+            <motion.button
+              type="button"
+              className="btn btn--primary"
+              onClick={onSubmit}
+              disabled={!query.trim()}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              transition={{ duration: 0.1 }}
+            >
+              <Send size={13} />
+              Investigate
+            </motion.button>
+          )}
+        </div>
       </div>
-      <div className="query-input__actions">
-        {isRunning ? (
-          <button className="query-input__btn query-input__btn--cancel" onClick={onCancel} type="button">
-            Cancel
-          </button>
-        ) : (
-          <button
-            className="query-input__btn query-input__btn--submit"
-            onClick={onSubmit}
-            disabled={!canSubmit}
-            type="button"
-          >
-            Ask FileMind
-          </button>
-        )}
-        {isRunning && <span className="query-input__status">Exploring...</span>}
-        <span className="query-input__hint">
-          {isRunning ? '' : '⌘+Enter to submit'}
-        </span>
+
+      {/* Hint */}
+      <div style={{ marginTop: 7, fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+        FileMind will inspect structure, follow imports, and cite the path it took.
       </div>
     </div>
   );
