@@ -178,7 +178,7 @@ function searchFileForSymbol(
     if (stat.size > MAX_FILE_SIZE_BYTES) return;
 
     const content = fs.readFileSync(filePath, 'utf8');
-    const displayPath = path.relative(targetRoot, filePath);
+    const displayPath = path.relative(targetRoot, filePath).replaceAll('\\', '/');
     const lines = content.split('\n');
 
     for (let i = 0; i < lines.length; i++) {

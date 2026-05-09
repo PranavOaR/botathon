@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { writeFileSync, mkdirSync, rmSync, symlinkSync, unlinkSync } from 'fs';
+import fs, { writeFileSync, mkdirSync, rmSync, symlinkSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { treeHandler } from '../src/tools/tree';
 import { readHandler } from '../src/tools/read';
@@ -275,12 +275,24 @@ describe('symlink escape prevention', () => {
   });
 
   it('read blocks a file symlink pointing outside targetPath', () => {
+    try {
+      if (!fs.lstatSync(fileSymlink).isSymbolicLink()) return;
+      if (!fs.existsSync(fileSymlink)) return;
+    } catch {
+      return; // symlink creation failed on this OS (e.g. Windows without privilege)
+    }
     const result = readHandler({ path: 'passwd-link' }, FIXTURE_DIR);
     expect(result.content).toContain('Access denied');
     expect(result.metadata).toBeUndefined();
   });
 
   it('tree blocks a directory symlink pointing outside targetPath', () => {
+    try {
+      if (!fs.lstatSync(dirSymlink).isSymbolicLink()) return;
+      if (!fs.existsSync(dirSymlink)) return;
+    } catch {
+      return; // symlink creation failed on this OS (e.g. Windows without privilege)
+    }
     const result = treeHandler({ path: 'tmp-link' }, FIXTURE_DIR);
     expect(result.content).toContain('Access denied');
   });

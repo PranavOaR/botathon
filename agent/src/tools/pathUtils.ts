@@ -76,7 +76,7 @@ export function resolveWithinTarget(targetRoot: string, userPath: string): Resol
     }
   }
 
-  const lexicalRelative = path.relative(normalizedRoot, absolutePath);
+  const lexicalRelative = path.relative(normalizedRoot, absolutePath).replaceAll('\\', '/');
   const displayPath = lexicalRelative === '' ? '.' : lexicalRelative;
 
   return { ok: true, absolutePath, displayPath };

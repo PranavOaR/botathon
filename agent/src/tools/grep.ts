@@ -153,7 +153,7 @@ function searchFile(
     if (stat.size > CONFIG.maxFileSizeKb * 1024) return;
 
     const content = fs.readFileSync(filePath, 'utf8');
-    const displayPath = path.relative(targetRoot, filePath);
+    const displayPath = path.relative(targetRoot, filePath).replaceAll('\\', '/');
     const lines = content.split('\n');
 
     for (let i = 0; i < lines.length; i++) {
