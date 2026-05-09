@@ -908,6 +908,186 @@ body::before {
 }
 
 /* =============================================
+   MODE TABS (local / github segmented control)
+   ============================================= */
+
+.mode-tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 8px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+  width: fit-content;
+}
+
+.mode-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+
+.mode-tab:hover:not(:disabled) {
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+}
+
+.mode-tab:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mode-tab--active {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
+}
+
+.mode-tab--active:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+/* Branch input — shorter width within the path row */
+.composer__branch-input {
+  width: 72px;
+  min-width: 72px;
+  flex: 0 0 72px;
+}
+
+.composer__path-input--url {
+  flex: 1;
+}
+
+/* =============================================
+   INTEGRATION STATUS (left rail)
+   ============================================= */
+
+.integration-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.integration-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  font-family: var(--font-mono);
+}
+
+.integration-item__name {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-secondary);
+}
+
+.integration-status-badge {
+  font-size: 9px;
+  font-family: var(--font-mono);
+  padding: 2px 5px;
+  border-radius: 3px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+}
+
+/* Status color modifiers */
+.status--importing    { color: var(--tool-tree); border-color: var(--tool-tree-border) !important; background: var(--tool-tree-bg) !important; }
+.status--imported     { color: var(--status-green); border-color: rgba(34,197,94,0.2) !important; background: rgba(34,197,94,0.07) !important; }
+.status--not_configured { color: var(--status-amber); border-color: rgba(245,158,11,0.2) !important; background: rgba(245,158,11,0.07) !important; }
+.status--error        { color: var(--status-red); border-color: var(--tool-error-border) !important; background: var(--tool-error-bg) !important; }
+.status--demo_mode    { color: var(--text-muted); }
+.status--ready        { color: var(--tool-tree); border-color: var(--tool-tree-border) !important; background: var(--tool-tree-bg) !important; }
+.status--unknown      { color: var(--text-dim); }
+.status--enabled      { color: var(--status-green); border-color: rgba(34,197,94,0.2) !important; background: rgba(34,197,94,0.07) !important; }
+.status--payment_required { color: var(--status-amber); border-color: rgba(245,158,11,0.2) !important; background: rgba(245,158,11,0.07) !important; }
+.status--disabled     { color: var(--text-dim); }
+.status--pending      { color: var(--status-amber); border-color: rgba(245,158,11,0.2) !important; background: rgba(245,158,11,0.07) !important; }
+.status--event_emitted { color: var(--status-green); border-color: rgba(34,197,94,0.2) !important; background: rgba(34,197,94,0.07) !important; }
+.status--event_failed  { color: var(--status-red); border-color: var(--tool-error-border) !important; background: var(--tool-error-bg) !important; }
+
+/* =============================================
+   IMPORT PROGRESS EVENTS (conversation feed)
+   ============================================= */
+
+.import-event {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  margin-bottom: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+}
+
+.import-event--importing {
+  border-color: var(--tool-tree-border);
+  background: var(--tool-tree-bg);
+}
+
+.import-event--done {
+  border-color: rgba(34,197,94,0.18);
+  background: rgba(34,197,94,0.07);
+}
+
+.import-event--error {
+  border-color: var(--tool-error-border);
+  background: var(--tool-error-bg);
+}
+
+.import-event__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.import-event--importing .import-event__icon { color: var(--tool-tree); }
+.import-event--done      .import-event__icon { color: var(--status-green); }
+.import-event--error     .import-event__icon { color: var(--status-red); }
+
+.import-spinner {
+  animation: spin 0.8s linear infinite;
+}
+
+.import-event__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.import-event__label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.import-event__detail {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* =============================================
    GLOBAL SCROLLBAR
    ============================================= */
 

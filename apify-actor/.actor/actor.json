@@ -1,0 +1,7 @@
+{
+  "actorSpecification": 1,
+  "name": "filemind-repo-importer",
+  "title": "FileMind Repository Importer",
+  "version": "0.1",
+  "buildTag": "latest"
+}

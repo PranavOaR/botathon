@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import { FileMindAgent } from '../agent';
 import { QueryBodySchema, StreamQuerySchema } from './schemas';
 import { saveCompletedSession } from './sessionStore';
+import { emitInvestigationCompleted, extractRepoUrl } from '../workflows/superplane';
 import type { AgentEvent, AgentResponse } from '../types';
 
 export interface AgentRunner {
@@ -47,6 +48,15 @@ export function createQueryRouter(agentRunner: AgentRunner = createDefaultAgentR
     try {
       const response = await agentRunner.run(query, targetPath);
       saveCompletedSession(response);
+      emitInvestigationCompleted({
+        sessionId: response.sessionId,
+        query,
+        targetPath,
+        repoUrl: extractRepoUrl(targetPath),
+        filesRead: response.filesRead,
+        iterationCount: response.iterationCount,
+        timestamp: new Date().toISOString(),
+      }).catch(console.warn);
       res.json(response);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Internal server error';
@@ -83,6 +93,15 @@ export function createQueryRouter(agentRunner: AgentRunner = createDefaultAgentR
     try {
       const response = await agentRunner.run(query, targetPath, onEvent);
       saveCompletedSession(response);
+      emitInvestigationCompleted({
+        sessionId: response.sessionId,
+        query,
+        targetPath,
+        repoUrl: extractRepoUrl(targetPath),
+        filesRead: response.filesRead,
+        iterationCount: response.iterationCount,
+        timestamp: new Date().toISOString(),
+      }).catch(console.warn);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Agent error';
       writeSse(res, { type: 'error', error: message });

@@ -37,4 +37,48 @@ export const CONFIG = {
     '.exe', '.dll', '.so', '.dylib',
     '.db', '.sqlite',
   ]),
+
+  // ─── Apify (lazy — undefined when not configured) ───────────────────────────
+  get apifyApiToken(): string | undefined {
+    return process.env['APIFY_API_TOKEN'];
+  },
+  get apifyActorId(): string | undefined {
+    return process.env['APIFY_ACTOR_ID'];
+  },
+
+  // ─── GitHub (lazy — optional, raises rate limit when set) ───────────────────
+  get githubToken(): string | undefined {
+    return process.env['GITHUB_TOKEN'];
+  },
+
+  // ─── Zynd AI / x402 micropayments ───────────────────────────────────────────
+  get x402Enabled(): boolean {
+    return process.env['X402_ENABLED'] === 'true';
+  },
+  get x402PriceUsdc(): string {
+    return process.env['X402_PRICE_USDC'] ?? '0.01';
+  },
+  get x402WalletAddress(): string | undefined {
+    return process.env['X402_WALLET_ADDRESS'];
+  },
+  get zyndApiKey(): string | undefined {
+    return process.env['ZYND_API_KEY'];
+  },
+  get zyndAgentId(): string | undefined {
+    return process.env['ZYND_AGENT_ID'];
+  },
+
+  // ─── Superplane workflow events ──────────────────────────────────────────────
+  get superplaneEnabled(): boolean {
+    return process.env['SUPERPLANE_ENABLED'] === 'true';
+  },
+  get superplaneApiToken(): string | undefined {
+    return process.env['SUPERPLANE_API_TOKEN'];
+  },
+  get superplaneCanvasId(): string | undefined {
+    return process.env['SUPERPLANE_CANVAS_ID'];
+  },
+  get superplaneEndpoint(): string {
+    return getEnv('SUPERPLANE_ENDPOINT', 'https://api.superplane.dev/v1/events');
+  },
 };

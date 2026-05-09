@@ -2,7 +2,8 @@
 
 import { useCallback, type KeyboardEvent } from 'react';
 import { motion } from 'framer-motion';
-import { Send, X, FolderOpen } from 'lucide-react';
+import { Send, X, FolderOpen, Globe, GitBranch } from 'lucide-react';
+import type { TargetMode } from '@/lib/types';
 
 const EXAMPLES = [
   'How does authentication work?',
@@ -10,7 +11,7 @@ const EXAMPLES = [
   'What files would I change to add role-based access?',
 ];
 
-interface QueryInputProps {
+export interface QueryInputProps {
   query: string;
   targetPath: string;
   isRunning: boolean;
@@ -18,6 +19,12 @@ interface QueryInputProps {
   onTargetPathChange: (p: string) => void;
   onSubmit: () => void;
   onCancel: () => void;
+  targetMode: TargetMode;
+  onTargetModeChange: (mode: TargetMode) => void;
+  repoUrl: string;
+  onRepoUrlChange: (url: string) => void;
+  branch: string;
+  onBranchChange: (b: string) => void;
 }
 
 export default function QueryInput({
@@ -28,6 +35,12 @@ export default function QueryInput({
   onTargetPathChange,
   onSubmit,
   onCancel,
+  targetMode,
+  onTargetModeChange,
+  repoUrl,
+  onRepoUrlChange,
+  branch,
+  onBranchChange,
 }: QueryInputProps) {
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -39,24 +52,82 @@ export default function QueryInput({
     [onSubmit]
   );
 
+  const isSubmitDisabled = isRunning || !query.trim() || (
+    targetMode === 'github' ? !repoUrl.trim() : false
+  );
+
   return (
     <div className="composer">
-      {/* Target path row */}
-      <div className="composer__path-row">
-        <label className="composer__path-label" htmlFor="target-path">
-          <FolderOpen size={11} />
-          repo
-        </label>
-        <input
-          id="target-path"
-          type="text"
-          className="composer__path-input"
-          value={targetPath}
-          onChange={e => onTargetPathChange(e.target.value)}
+      {/* Mode tabs */}
+      <div className="mode-tabs">
+        <button
+          type="button"
+          className={`mode-tab${targetMode === 'local' ? ' mode-tab--active' : ''}`}
+          onClick={() => onTargetModeChange('local')}
           disabled={isRunning}
-          spellCheck={false}
-        />
+        >
+          <FolderOpen size={11} />
+          Local path
+        </button>
+        <button
+          type="button"
+          className={`mode-tab${targetMode === 'github' ? ' mode-tab--active' : ''}`}
+          onClick={() => onTargetModeChange('github')}
+          disabled={isRunning}
+        >
+          <Globe size={11} />
+          GitHub repo
+        </button>
       </div>
+
+      {/* Target input row — conditional on mode */}
+      {targetMode === 'local' ? (
+        <div className="composer__path-row">
+          <label className="composer__path-label" htmlFor="target-path">
+            <FolderOpen size={11} />
+            repo
+          </label>
+          <input
+            id="target-path"
+            type="text"
+            className="composer__path-input"
+            value={targetPath}
+            onChange={e => onTargetPathChange(e.target.value)}
+            disabled={isRunning}
+            spellCheck={false}
+          />
+        </div>
+      ) : (
+        <div className="composer__path-row">
+          <label className="composer__path-label" htmlFor="repo-url">
+            <Globe size={11} />
+            url
+          </label>
+          <input
+            id="repo-url"
+            type="url"
+            className="composer__path-input composer__path-input--url"
+            value={repoUrl}
+            onChange={e => onRepoUrlChange(e.target.value)}
+            disabled={isRunning}
+            placeholder="https://github.com/owner/repo"
+            spellCheck={false}
+          />
+          <label className="composer__path-label" htmlFor="repo-branch" style={{ marginLeft: 6 }}>
+            <GitBranch size={11} />
+          </label>
+          <input
+            id="repo-branch"
+            type="text"
+            className="composer__path-input composer__branch-input"
+            value={branch}
+            onChange={e => onBranchChange(e.target.value)}
+            disabled={isRunning}
+            placeholder="main"
+            spellCheck={false}
+          />
+        </div>
+      )}
 
       {/* Query textarea */}
       <textarea
@@ -108,7 +179,7 @@ export default function QueryInput({
               type="button"
               className="btn btn--primary"
               onClick={onSubmit}
-              disabled={!query.trim()}
+              disabled={isSubmitDisabled}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.97 }}
               transition={{ duration: 0.1 }}

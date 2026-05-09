@@ -1,0 +1,34 @@
+{
+  "title": "FileMind Repository Importer Input",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "repoUrl": {
+      "title": "GitHub Repository URL",
+      "type": "string",
+      "description": "Full GitHub repository URL, e.g. https://github.com/user/repo",
+      "editor": "textfield"
+    },
+    "branch": {
+      "title": "Branch",
+      "type": "string",
+      "description": "Git branch to fetch (default: main)",
+      "editor": "textfield",
+      "default": "main"
+    },
+    "maxFiles": {
+      "title": "Max Files",
+      "type": "integer",
+      "description": "Maximum number of files to fetch (default: 500)",
+      "default": 500
+    },
+    "includeExtensions": {
+      "title": "Include Extensions",
+      "type": "array",
+      "description": "File extensions to include (default: common code/doc extensions)",
+      "editor": "json",
+      "default": [".ts", ".tsx", ".js", ".jsx", ".py", ".md", ".json"]
+    }
+  },
+  "required": ["repoUrl"]
+}
