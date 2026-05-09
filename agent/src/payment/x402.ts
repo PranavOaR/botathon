@@ -2,19 +2,21 @@ import type { Request, Response, NextFunction, RequestHandler } from 'express';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface PaymentRequiredBody {
-  error: string;
-  price: string;
-  currency: string;
-  walletAddress: string;
-  agentId: string;
-}
-
-interface PaymentVerifier {
+export interface PaymentVerifier {
   verify(
     paymentHeader: string,
     req: Request
   ): Promise<{ ok: true } | { ok: false; status: number; body: unknown }>;
+}
+
+interface PaymentRequiredBody {
+  error: string;
+  provider: 'zynd';
+  price: string;
+  currency: string;
+  walletAddress: string;
+  agentId: string;
+  paymentHeader: string;
 }
 
 // ─── Zynd verifier ────────────────────────────────────────────────────────────
@@ -24,8 +26,8 @@ interface PaymentVerifier {
  * TODO: Replace with official Zynd SDK once API shape is confirmed.
  *
  * Current behaviour:
- * - If ZYND_API_KEY is not set → 503 (not configured)
- * - If set → POSTs to ZYND_VERIFY_ENDPOINT for verification
+ * - If ZYND_API_KEY is not set -> 503 (not configured)
+ * - If set -> POSTs to ZYND_VERIFY_ENDPOINT for verification
  */
 function createZyndVerifier(): PaymentVerifier {
   return {
@@ -82,7 +84,8 @@ function createZyndVerifier(): PaymentVerifier {
  * a no-op pass-through — safe to wire unconditionally in server.ts.
  *
  * When enabled:
- * - Reads x-payment header from the request
+ * - Returns 503 if X402_WALLET_ADDRESS or ZYND_AGENT_ID is not configured
+ * - Reads payment header from the request
  * - Returns 402 with payment details if header is missing
  * - Delegates to verifier if header is present
  * - Returns 402 or 503 based on verifier result
@@ -97,29 +100,39 @@ export function createX402Middleware(
     return (_req: Request, _res: Response, next: NextFunction) => next();
   }
 
-  const price = process.env['X402_PRICE_USDC'] ?? '0.01';
-  const walletAddress = process.env['X402_WALLET_ADDRESS'] ?? '';
-  const agentId = process.env['ZYND_AGENT_ID'] ?? '';
-  const paymentHeader = process.env['X402_PAYMENT_HEADER'] ?? 'x-payment';
-
-  if (!walletAddress) {
-    console.warn('[x402] X402_WALLET_ADDRESS is not set — payment responses will have empty wallet address');
-  }
-  if (!agentId) {
-    console.warn('[x402] ZYND_AGENT_ID is not set — payment responses will have empty agentId');
-  }
-
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const payment = req.headers[paymentHeader.toLowerCase()] as string | undefined;
+      // Per-request config read — allows env to change between factory time and request time
+      const price = process.env['X402_PRICE_USDC'] ?? '0.01';
+      const walletAddress = process.env['X402_WALLET_ADDRESS'] ?? '';
+      const agentId = process.env['ZYND_AGENT_ID'] ?? '';
+      const paymentHeaderName = (process.env['X402_PAYMENT_HEADER'] ?? 'x-payment').toLowerCase();
+
+      // Misconfiguration check — return 503 rather than a misleading 402
+      if (!walletAddress) {
+        res.status(503).json({
+          error: 'Payment gateway misconfigured: X402_WALLET_ADDRESS is required when X402_ENABLED=true',
+        });
+        return;
+      }
+      if (!agentId) {
+        res.status(503).json({
+          error: 'Payment gateway misconfigured: ZYND_AGENT_ID is required when X402_ENABLED=true',
+        });
+        return;
+      }
+
+      const payment = req.headers[paymentHeaderName] as string | undefined;
 
       if (!payment) {
         const body: PaymentRequiredBody = {
           error: 'Payment required',
+          provider: 'zynd',
           price,
           currency: 'USDC',
           walletAddress,
           agentId,
+          paymentHeader: paymentHeaderName,
         };
         res.status(402).json(body);
         return;
