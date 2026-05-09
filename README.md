@@ -17,6 +17,7 @@ Express Server (:3001)
         +-- GET  /query/stream   → SSE event stream (real-time)
         +-- GET  /sessions/:id   → Past session lookup
         +-- GET  /health
+        +-- GET  /integrations/status -> Sponsor integration config (public, no auth)
         |
         v
 FileMindAgent (Claude Opus 4.5 + tool use)
@@ -144,7 +145,7 @@ FileMind can investigate remote GitHub repositories without cloning them locally
 - `APIFY_ACTOR_ID` — the published actor ID (e.g. `username/filemind-repo-importer`)
 - `GITHUB_TOKEN` — optional but raises GitHub's API rate limit from 60 to 5000 req/hr
 
-**Without these set:** `POST /repos/import` returns `503 — Apify integration not configured`. Local path mode is unaffected.
+**Without `APIFY_API_TOKEN` and `APIFY_ACTOR_ID`:** `POST /repos/import` falls back to the direct GitHub API for public repos — it fetches the file tree from GitHub's tree API and downloads raw content from `raw.githubusercontent.com`. The 503 only occurs if this direct fetch itself fails. Local path mode is always unaffected.
 
 **Apify actor limits:**
 
@@ -186,7 +187,30 @@ ZYND_AGENT_ID=...                # Your registered agent ID on deployer.zynd.ai
 ```
 
 When `X402_ENABLED=false` (default): all requests pass through, no payment required.
-When `X402_ENABLED=true`: `POST /query` and `POST /repos/import` return HTTP 402 if the request does not include a valid x402 payment header.
+
+When `X402_ENABLED=true`: `POST /query`, `GET /query/stream`, and `POST /repos/import` are payment-gated. `GET /health`, `GET /sessions/:id`, and `GET /integrations/status` are always public.
+
+If `X402_WALLET_ADDRESS` or `ZYND_AGENT_ID` is missing while enabled, routes return HTTP 503 (misconfigured) rather than a misleading 402.
+
+**HTTP 402 body (payment required):**
+```json
+{
+  "error": "Payment required",
+  "provider": "zynd",
+  "price": "0.01",
+  "currency": "USDC",
+  "walletAddress": "0xYourWallet",
+  "agentId": "your-agent-id",
+  "paymentHeader": "x-payment"
+}
+```
+
+**HTTP 503 body (misconfigured):**
+```json
+{
+  "error": "Payment gateway misconfigured: X402_WALLET_ADDRESS is required when X402_ENABLED=true"
+}
+```
 
 ### Superplane (workflow event tracking)
 
@@ -206,6 +230,43 @@ When `SUPERPLANE_ENABLED=true`: the server POSTs a `filemind.investigation.compl
 MAX_FILE_SIZE_KB=500             # Default: 500. Files over this are skipped.
 MAX_TREE_DEPTH=6                 # Default: 6. Tree traversal depth cap.
 ```
+
+---
+
+## Integration Status API
+
+`GET /integrations/status` returns the current configuration state for all sponsor integrations. Always public — never x402-guarded. The frontend fetches this on page load to set accurate integration badges.
+
+**Example response (all disabled):**
+```json
+{
+  "apify": {
+    "configured": false,
+    "mode": "github_fallback",
+    "hasApiToken": false,
+    "hasActorId": false,
+    "githubTokenConfigured": false
+  },
+  "zynd": {
+    "enabled": false,
+    "configured": false,
+    "price": "0.01",
+    "currency": "USDC",
+    "walletAddress": "",
+    "agentId": "",
+    "paymentHeader": "x-payment"
+  },
+  "superplane": {
+    "enabled": false,
+    "configured": false,
+    "hasApiToken": false,
+    "hasCanvasId": false,
+    "endpoint": "https://api.superplane.dev/v1/events"
+  }
+}
+```
+
+Secret values (API keys) are never included — only boolean `has*` fields.
 
 ---
 
