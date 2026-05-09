@@ -5,6 +5,7 @@ import { createHealthRouter } from './routes/health';
 import { createQueryRouter } from './routes/query';
 import { createSessionsRouter } from './routes/sessions';
 import { createReposRouter } from './routes/repos';
+import { createIntegrationsRouter } from './routes/integrations';
 import { createX402Middleware } from './payment/x402';
 import type { AgentRunner } from './routes/query';
 
@@ -22,12 +23,16 @@ export function createApp(options?: { agentRunner?: AgentRunner }) {
   // x402 micropayment guard — no-op when X402_ENABLED !== 'true'
   const x402 = createX402Middleware();
 
+  // Public routes — never x402-guarded
   app.use(createHealthRouter());
+  app.use(createIntegrationsRouter());
+  app.use(createSessionsRouter());
+
+  // Payment-gated routes
   app.use('/query', x402);
   app.use('/repos', x402);
   app.use(createQueryRouter(options?.agentRunner));
   app.use(createReposRouter());
-  app.use(createSessionsRouter());
 
   // 404 catch-all
   app.use((_req, res) => {
