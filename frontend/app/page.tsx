@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { streamQuery } from '@/lib/sseClient';
 import type { AgentEvent } from '@/lib/sseClient';
-import type { TargetMode, IntegrationStatus } from '@/lib/types';
+import type { TargetMode, IntegrationStatus, ZyndPaymentInfo, BackendIntegrationsStatus } from '@/lib/types';
 import StatusBar from '@/components/StatusBar';
 import LeftRail from '@/components/LeftRail';
 import QueryInput from '@/components/QueryInput';
@@ -94,10 +94,14 @@ export default function HomePage() {
     zynd: 'demo_mode',
     superplane: 'disabled',
   });
+  const [zyndPaymentInfo, setZyndPaymentInfo] = useState<ZyndPaymentInfo | null>(null);
+
   const streamRef = useRef<{ close: () => void } | null>(null);
   const feedRef = useRef<HTMLDivElement>(null);
-  const superplaneTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Tracks the backend's reported superplane enabled state for use after investigations
+  const backendSuperplaneEnabled = useRef(false);
 
+  // Health check polling
   useEffect(() => {
     const check = async () => {
       try {
@@ -112,34 +116,51 @@ export default function HomePage() {
     return () => clearInterval(id);
   }, []);
 
-  useEffect(() => () => {
-    streamRef.current?.close();
-    if (superplaneTimerRef.current !== null) {
-      clearTimeout(superplaneTimerRef.current);
-    }
+  // Fetch integration status on mount — sets honest initial badge state from backend
+  useEffect(() => {
+    const fetchIntegrations = async () => {
+      try {
+        const res = await fetch(`${API_URL}/integrations/status`);
+        if (!res.ok) return;
+        const status: BackendIntegrationsStatus = await res.json();
+
+        backendSuperplaneEnabled.current = status.superplane.enabled && status.superplane.configured;
+
+        setIntegrations(prev => ({
+          ...prev,
+          apify: status.apify.configured ? 'ready' : 'not_configured',
+          zynd: status.zynd.enabled
+            ? status.zynd.configured
+              ? 'enabled'
+              : 'error'
+            : 'demo_mode',
+          superplane: status.superplane.enabled ? 'disabled' : 'disabled',
+        }));
+      } catch {
+        // Backend unavailable — leave defaults for graceful degradation
+      }
+    };
+    fetchIntegrations();
   }, []);
 
+  // Cleanup on unmount
+  useEffect(() => () => {
+    streamRef.current?.close();
+  }, []);
+
+  // Auto-scroll feed
   useEffect(() => {
     if (feedRef.current) {
       feedRef.current.scrollTop = feedRef.current.scrollHeight;
     }
   }, [events.length, importStatus]);
 
-  // Update apify status to 'ready' when switching to github mode (before submission)
+  // Sync apify badge with target mode (only if in github mode and apify unknown)
   useEffect(() => {
     if (targetMode === 'github' && integrations.apify === 'unknown') {
-      setIntegrations(prev => ({ ...prev, apify: 'ready' }));
-    } else if (targetMode === 'local') {
-      setIntegrations(prev => ({ ...prev, apify: 'unknown' }));
+      setIntegrations(prev => ({ ...prev, apify: 'not_configured' }));
     }
   }, [targetMode]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const triggerSuperplaneSimulation = useCallback(() => {
-    setIntegrations(prev => ({ ...prev, superplane: 'pending' }));
-    superplaneTimerRef.current = setTimeout(() => {
-      setIntegrations(prev => ({ ...prev, superplane: 'event_emitted' }));
-    }, 2000);
-  }, []);
 
   const buildEventHandlers = useCallback((resolvedPath: string) => {
     return {
@@ -149,7 +170,10 @@ export default function HomePage() {
         if (event.type === 'done') {
           setIterationCount(event.iterationCount ?? null);
           setIsRunning(false);
-          triggerSuperplaneSimulation();
+          // Mark superplane as emitted if it was configured — server fires it server-side
+          if (backendSuperplaneEnabled.current) {
+            setIntegrations(prev => ({ ...prev, superplane: 'event_emitted' }));
+          }
         }
         if (event.type === 'error') {
           setError(event.error ?? 'Unknown error');
@@ -163,9 +187,19 @@ export default function HomePage() {
       onClose() {
         setIsRunning(false);
       },
+      onPaymentRequired(info: ZyndPaymentInfo) {
+        setZyndPaymentInfo(info);
+        setIntegrations(prev => ({ ...prev, zynd: 'payment_required' }));
+        setIsRunning(false);
+        // query is preserved intentionally — user can retry after paying
+      },
+      onServiceUnavailable(message: string) {
+        setError(message);
+        setIsRunning(false);
+      },
       resolvedPath,
     };
-  }, [triggerSuperplaneSimulation]);
+  }, []);
 
   const handleSubmit = useCallback(() => {
     if (isRunning || !query.trim()) return;
@@ -176,10 +210,14 @@ export default function HomePage() {
     setAnswer(null);
     setIterationCount(null);
     setError(null);
+    setZyndPaymentInfo(null);
     setSubmittedQuery(query.trim());
     setImportStatus('idle');
     setImportMessage(null);
-    setIntegrations(prev => ({ ...prev, superplane: 'disabled' }));
+    setIntegrations(prev => ({
+      ...prev,
+      superplane: backendSuperplaneEnabled.current ? 'pending' : 'disabled',
+    }));
     setIsRunning(true);
 
     const handlers = buildEventHandlers(targetPath.trim());
@@ -191,6 +229,8 @@ export default function HomePage() {
       onEvent: handlers.onEvent,
       onError: handlers.onError,
       onClose: handlers.onClose,
+      onPaymentRequired: handlers.onPaymentRequired,
+      onServiceUnavailable: handlers.onServiceUnavailable,
     });
 
     streamRef.current = stream;
@@ -205,10 +245,15 @@ export default function HomePage() {
     setAnswer(null);
     setIterationCount(null);
     setError(null);
+    setZyndPaymentInfo(null);
     setSubmittedQuery(query.trim());
     setImportStatus('importing');
     setImportMessage(null);
-    setIntegrations(prev => ({ ...prev, apify: 'importing', superplane: 'disabled' }));
+    setIntegrations(prev => ({
+      ...prev,
+      apify: 'importing',
+      superplane: backendSuperplaneEnabled.current ? 'pending' : 'disabled',
+    }));
 
     try {
       const res = await fetch(`${API_URL}/repos/import`, {
@@ -219,6 +264,24 @@ export default function HomePage() {
           branch: branch.trim() || 'main',
         }),
       });
+
+      // Payment required from import endpoint
+      if (res.status === 402) {
+        const body = await res.json().catch(() => ({})) as Record<string, string>;
+        const info: ZyndPaymentInfo = {
+          price: body.price ?? '0.01',
+          currency: body.currency ?? 'USDC',
+          walletAddress: body.walletAddress ?? '',
+          agentId: body.agentId ?? '',
+          paymentHeader: body.paymentHeader ?? 'x-payment',
+        };
+        setZyndPaymentInfo(info);
+        setIntegrations(prev => ({ ...prev, zynd: 'payment_required' }));
+        setImportStatus('error');
+        setImportMessage('Payment required to import repository');
+        setIsRunning(false);
+        return;
+      }
 
       const data: { targetPath?: string; repoUrl?: string; branch?: string; fileCount?: number; error?: string } =
         await res.json();
@@ -258,6 +321,8 @@ export default function HomePage() {
         onEvent: handlers.onEvent,
         onError: handlers.onError,
         onClose: handlers.onClose,
+        onPaymentRequired: handlers.onPaymentRequired,
+        onServiceUnavailable: handlers.onServiceUnavailable,
       });
 
       streamRef.current = stream;
@@ -296,6 +361,7 @@ export default function HomePage() {
           targetMode={targetMode}
           repoUrl={repoUrl}
           integrations={integrations}
+          zyndPaymentInfo={zyndPaymentInfo}
         />
         <div className="center-panel">
           <div className="conversation-feed" ref={feedRef}>
@@ -311,7 +377,7 @@ export default function HomePage() {
               </div>
             ) : (
               <>
-                {/* Import progress — shown above user bubble in GitHub mode */}
+                {/* Import progress -- shown above user bubble in GitHub mode */}
                 <AnimatePresence>
                   {importStatus === 'importing' && (
                     <ImportProgress repoUrl={repoUrl} />
