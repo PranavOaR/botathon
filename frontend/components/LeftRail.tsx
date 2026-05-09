@@ -3,7 +3,7 @@
 import { motion } from 'framer-motion';
 import { Cloud, CreditCard, Zap } from 'lucide-react';
 import type { AgentEvent } from '@/lib/sseClient';
-import type { TargetMode, IntegrationStatus, ApifyStatus, ZyndStatus, SuperplaneStatus } from '@/lib/types';
+import type { TargetMode, IntegrationStatus, ApifyStatus, ZyndStatus, SuperplaneStatus, ZyndPaymentInfo } from '@/lib/types';
 
 interface LeftRailProps {
   targetPath: string;
@@ -12,6 +12,7 @@ interface LeftRailProps {
   targetMode: TargetMode;
   repoUrl?: string;
   integrations: IntegrationStatus;
+  zyndPaymentInfo?: ZyndPaymentInfo | null;
 }
 
 const TOOL_LEGEND = [
@@ -26,7 +27,7 @@ const APIFY_STATUS_LABEL: Record<ApifyStatus, string> = {
   unknown:        'unknown',
   not_configured: 'not configured',
   ready:          'ready',
-  importing:      'importing…',
+  importing:      'importing...',
   imported:       'imported',
   error:          'error',
 };
@@ -40,7 +41,7 @@ const ZYND_STATUS_LABEL: Record<ZyndStatus, string> = {
 
 const SUPERPLANE_STATUS_LABEL: Record<SuperplaneStatus, string> = {
   disabled:      'disabled',
-  pending:       'pending…',
+  pending:       'pending...',
   event_emitted: 'emitted',
   event_failed:  'failed',
 };
@@ -66,7 +67,7 @@ function ApifyBadge({ status }: { status: ApifyStatus }) {
   );
 }
 
-function ZyndBadge({ status }: { status: ZyndStatus }) {
+function ZyndBadge({ status, paymentInfo }: { status: ZyndStatus; paymentInfo?: ZyndPaymentInfo | null }) {
   const statusClass = `status--${status}`;
   return (
     <div className="integration-item">
@@ -83,6 +84,30 @@ function ZyndBadge({ status }: { status: ZyndStatus }) {
       >
         {ZYND_STATUS_LABEL[status]}
       </motion.span>
+      {status === 'payment_required' && paymentInfo && (
+        <div className="zynd-payment-info">
+          <div className="zynd-payment-row">
+            <span>Price</span>
+            <span>{paymentInfo.price} {paymentInfo.currency}</span>
+          </div>
+          <div className="zynd-payment-row">
+            <span>Header</span>
+            <span className="zynd-wallet">{paymentInfo.paymentHeader}</span>
+          </div>
+          {paymentInfo.walletAddress && (
+            <div className="zynd-payment-row">
+              <span>Wallet</span>
+              <span className="zynd-wallet">{paymentInfo.walletAddress}</span>
+            </div>
+          )}
+          {paymentInfo.agentId && (
+            <div className="zynd-payment-row">
+              <span>Agent</span>
+              <span className="zynd-wallet">{paymentInfo.agentId}</span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -115,6 +140,7 @@ export default function LeftRail({
   targetMode,
   repoUrl,
   integrations,
+  zyndPaymentInfo,
 }: LeftRailProps) {
   const toolCalls = events.filter(e => e.type === 'tool_call');
   const toolResults = events.filter(e => e.type === 'tool_result');
@@ -126,11 +152,11 @@ export default function LeftRail({
     }
   }
 
-  const status = isRunning ? 'Investigating…' : events.length > 0 ? 'Complete' : 'Idle';
+  const status = isRunning ? 'Investigating...' : events.length > 0 ? 'Complete' : 'Idle';
 
   const repoDisplay = targetMode === 'github'
-    ? (repoUrl ?? '—')
-    : (targetPath || '—');
+    ? (repoUrl ?? '--')
+    : (targetPath || '--');
 
   return (
     <aside className="left-rail">
@@ -195,7 +221,7 @@ export default function LeftRail({
           <div className="rail-label">Integrations</div>
           <div className="integration-list">
             <ApifyBadge status={integrations.apify} />
-            <ZyndBadge status={integrations.zynd} />
+            <ZyndBadge status={integrations.zynd} paymentInfo={zyndPaymentInfo} />
             <SuperplaneBadge status={integrations.superplane} />
           </div>
         </div>
