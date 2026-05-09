@@ -118,13 +118,7 @@ Have a second terminal ready for raw `curl` commands — this shows the agent is
 
 **If Apify is not configured:**
 
-```bash
-curl -X POST http://localhost:3001/repos/import \
-  -H "Content-Type: application/json" \
-  -d '{"repoUrl": "https://github.com/expressjs/express"}'
-# {"error":"Apify integration not configured. Set APIFY_API_TOKEN and APIFY_ACTOR_ID."}
-```
-Show this honestly — explain what it would do with the tokens.
+Without `APIFY_API_TOKEN` and `APIFY_ACTOR_ID`, the backend falls back to the direct GitHub API for public repos. The Apify actor path fetches content via the actor; the fallback path fetches directly from `raw.githubusercontent.com`. Both write files to `.filemind/remote/` for the agent to investigate. Show the fallback working and explain Apify is the production path for private repos and larger limits.
 
 ---
 
@@ -148,8 +142,20 @@ Show this honestly — explain what it would do with the tokens.
    HTTP/1.1 402 Payment Required
    {
      "error": "Payment required",
-     "price": "0.01 USDC",
-     "paymentUrl": "https://..."
+     "provider": "zynd",
+     "price": "0.01",
+     "currency": "USDC",
+     "walletAddress": "0xYourWallet",
+     "agentId": "your-agent-id",
+     "paymentHeader": "x-payment"
+   }
+   ```
+
+   Or, if `X402_WALLET_ADDRESS`/`ZYND_AGENT_ID` is missing:
+   ```json
+   HTTP/1.1 503 Service Unavailable
+   {
+     "error": "Payment gateway misconfigured: X402_WALLET_ADDRESS is required when X402_ENABLED=true"
    }
    ```
 
