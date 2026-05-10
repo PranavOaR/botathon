@@ -30,7 +30,16 @@ export default function StatusBar({
   return (
     <header className="topbar">
       <div className="topbar__brand">
-        <div className="brand-mark" aria-hidden="true">FM</div>
+        <div className="brand-mark" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="2" y="3" width="7" height="1" rx="0.5" fill="white" opacity="0.9"/>
+            <rect x="2" y="5.5" width="5" height="1" rx="0.5" fill="white" opacity="0.7"/>
+            <rect x="2" y="8" width="6" height="1" rx="0.5" fill="white" opacity="0.7"/>
+            <rect x="2" y="10.5" width="4" height="1" rx="0.5" fill="white" opacity="0.5"/>
+            <circle cx="12" cy="6.5" r="2.5" stroke="white" strokeWidth="1.2" opacity="0.9"/>
+            <line x1="13.8" y1="8.5" x2="15.5" y2="10.5" stroke="white" strokeWidth="1.2" strokeLinecap="round" opacity="0.9"/>
+          </svg>
+        </div>
         <span className="brand-name">FileMind</span>
         <span className="brand-meta">structure-aware nav</span>
       </div>

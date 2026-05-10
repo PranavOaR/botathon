@@ -47,7 +47,16 @@ function EmptyHero({ onPick }: { onPick: (prompt: string) => void }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: 'easeOut' }}
     >
-      <div className="empty-hero__mark" aria-hidden="true">FM</div>
+      <div className="empty-hero__mark" aria-hidden="true">
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="4" y="6" width="14" height="2" rx="1" fill="white" opacity="0.9"/>
+          <rect x="4" y="11" width="10" height="2" rx="1" fill="white" opacity="0.7"/>
+          <rect x="4" y="16" width="12" height="2" rx="1" fill="white" opacity="0.7"/>
+          <rect x="4" y="21" width="8" height="2" rx="1" fill="white" opacity="0.5"/>
+          <circle cx="24" cy="13" r="5" stroke="white" strokeWidth="1.8" opacity="0.9"/>
+          <line x1="27.5" y1="17" x2="31" y2="21" stroke="white" strokeWidth="1.8" strokeLinecap="round" opacity="0.9"/>
+        </svg>
+      </div>
       <h1 className="empty-hero__title">
         Ask <em>FileMind</em> anything about your codebase
       </h1>
@@ -163,7 +172,7 @@ export default function HomePage() {
           zynd: status.zynd.enabled
             ? status.zynd.configured ? 'enabled' : 'error'
             : 'demo_mode',
-          superplane: status.superplane.enabled ? 'disabled' : 'disabled',
+          superplane: status.superplane.enabled && status.superplane.configured ? 'pending' : 'disabled',
         }));
       } catch {
         // graceful degradation

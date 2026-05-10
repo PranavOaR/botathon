@@ -1,0 +1,44 @@
+{
+  "name": "FileMind",
+  "version": "1.0.0",
+  "description": "Structure-aware codebase navigation agent. Walks the file tree, follows imports, and answers questions about any GitHub repository — no embeddings, no stale RAG.",
+  "category": "developer-tools",
+  "tags": ["codebase", "navigation", "github", "analysis", "file-tree"],
+  "pricing": {
+    "model": "per-request",
+    "currency": "USDC",
+    "amount": "0.01"
+  },
+  "endpoints": {
+    "query": {
+      "path": "/query",
+      "method": "POST",
+      "description": "Run a structured investigation query against a local or remote codebase",
+      "contentType": "application/json"
+    },
+    "stream": {
+      "path": "/query/stream",
+      "method": "GET",
+      "description": "Stream investigation events (SSE) for live reasoning trace",
+      "contentType": "text/event-stream"
+    },
+    "import": {
+      "path": "/repos/import",
+      "method": "POST",
+      "description": "Import a remote GitHub repository for querying",
+      "contentType": "application/json"
+    },
+    "health": {
+      "path": "/health",
+      "method": "GET",
+      "description": "Health check — returns uptime and status"
+    }
+  },
+  "payment": {
+    "header": "x-payment",
+    "protocol": "x402"
+  },
+  "contact": {
+    "github": "https://github.com/PranavOaR/botathon"
+  }
+}

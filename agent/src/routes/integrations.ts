@@ -1,27 +1,31 @@
 import { Router } from 'express';
 
+function isSet(val: string): boolean {
+  return val.length > 0 && !val.includes('...');
+}
+
 export function createIntegrationsRouter(): Router {
   const router = Router();
 
   router.get('/integrations/status', (_req, res) => {
-    const apifyApiToken = process.env['APIFY_API_TOKEN'] ?? '';
-    const apifyActorId = process.env['APIFY_ACTOR_ID'] ?? '';
-    const githubToken = process.env['GITHUB_TOKEN'] ?? '';
+    const apifyApiToken = (process.env['APIFY_API_TOKEN'] ?? '').trim();
+    const apifyActorId = (process.env['APIFY_ACTOR_ID'] ?? '').trim();
+    const githubToken = (process.env['GITHUB_TOKEN'] ?? '').trim();
 
-    const apifyHasApiToken = apifyApiToken.length > 0;
-    const apifyHasActorId = apifyActorId.length > 0;
+    const apifyHasApiToken = isSet(apifyApiToken);
+    const apifyHasActorId = isSet(apifyActorId);
     const apifyConfigured = apifyHasApiToken && apifyHasActorId;
 
     const zyndEnabled = process.env['X402_ENABLED'] === 'true';
-    const zyndWalletAddress = process.env['X402_WALLET_ADDRESS'] ?? '';
-    const zyndAgentId = process.env['ZYND_AGENT_ID'] ?? '';
-    const zyndConfigured = zyndEnabled && zyndWalletAddress.length > 0 && zyndAgentId.length > 0;
+    const zyndWalletAddress = (process.env['X402_WALLET_ADDRESS'] ?? '').trim();
+    const zyndAgentId = (process.env['ZYND_AGENT_ID'] ?? '').trim();
+    const zyndConfigured = zyndEnabled && isSet(zyndWalletAddress) && isSet(zyndAgentId);
 
     const superplaneEnabled = process.env['SUPERPLANE_ENABLED'] === 'true';
-    const superplaneApiToken = process.env['SUPERPLANE_API_TOKEN'] ?? '';
-    const superplaneCanvasId = process.env['SUPERPLANE_CANVAS_ID'] ?? '';
-    const superplaneHasApiToken = superplaneApiToken.length > 0;
-    const superplaneHasCanvasId = superplaneCanvasId.length > 0;
+    const superplaneApiToken = (process.env['SUPERPLANE_API_TOKEN'] ?? '').trim();
+    const superplaneCanvasId = (process.env['SUPERPLANE_CANVAS_ID'] ?? '').trim();
+    const superplaneHasApiToken = isSet(superplaneApiToken);
+    const superplaneHasCanvasId = isSet(superplaneCanvasId);
     const superplaneConfigured = superplaneEnabled && superplaneHasApiToken && superplaneHasCanvasId;
 
     res.json({

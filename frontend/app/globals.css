@@ -422,17 +422,12 @@ input, textarea { font: inherit; color: inherit; }
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--font-mono);
-  font-size: 18px;
-  font-weight: 700;
-  color: #fff;
   background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.22),
     0 0 0 1px rgba(59, 130, 246, 0.4),
     0 18px 48px -12px rgba(59, 130, 246, 0.55);
   position: relative;
-  letter-spacing: -0.02em;
 }
 
 .empty-hero__mark::after {
@@ -443,6 +438,7 @@ input, textarea { font: inherit; color: inherit; }
   background: linear-gradient(180deg, rgba(255,255,255,0.12), transparent 40%);
   pointer-events: none;
 }
+
 
 .empty-hero__title {
   font-size: 26px;

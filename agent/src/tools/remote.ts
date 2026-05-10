@@ -209,8 +209,8 @@ async function fetchViaApify(
   repoUrl: string,
   branch: string
 ): Promise<RemoteRepoOutput> {
-  const apifyToken = process.env['APIFY_API_TOKEN'];
-  const actorId = process.env['APIFY_ACTOR_ID'];
+  const apifyToken = process.env['APIFY_API_TOKEN']?.trim();
+  const actorId = process.env['APIFY_ACTOR_ID']?.trim();
 
   if (!apifyToken || !actorId) {
     throw new Error('APIFY_API_TOKEN and APIFY_ACTOR_ID must be set to use Apify');
@@ -293,8 +293,8 @@ export async function importRemoteRepo(
     `${owner}-${repo}-${branch}`
   );
 
-  const apifyToken = process.env['APIFY_API_TOKEN'];
-  const actorId = process.env['APIFY_ACTOR_ID'];
+  const apifyToken = process.env['APIFY_API_TOKEN']?.trim();
+  const actorId = process.env['APIFY_ACTOR_ID']?.trim();
   const useApify = Boolean(apifyToken && actorId);
   const importMode: 'apify' | 'github_fallback' = useApify ? 'apify' : 'github_fallback';
 

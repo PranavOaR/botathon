@@ -4,10 +4,13 @@
   "description": "Structure-aware codebase navigation agent — Botathon 2026",
   "private": true,
   "scripts": {
-    "agent:dev": "cd agent && npm run dev",
+    "agent:dev": "cd agent && npm run dev:server",
     "agent:build": "cd agent && npm run build",
     "agent:test": "cd agent && npm test",
     "frontend:dev": "cd frontend && npm run dev",
-    "dev": "npm run agent:dev"
+    "dev": "concurrently --names \"agent,frontend\" --prefix-colors \"blue,green\" \"npm run agent:dev\" \"npm run frontend:dev\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
   }
 }
