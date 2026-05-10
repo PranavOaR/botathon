@@ -14,7 +14,7 @@ export function createApp(options?: { agentRunner?: AgentRunner }) {
 
   app.use(
     cors({
-      origin: CONFIG.nodeEnv !== 'production' ? true : false,
+      origin: true,
     })
   );
 
