@@ -61,8 +61,8 @@ function EmptyHero({ onPick }: { onPick: (prompt: string) => void }) {
         Ask <em>FileMind</em> anything about your codebase
       </h1>
       <p className="empty-hero__sub">
-        FileMind walks the file tree, follows imports, and cites the exact path
-        it took — no embeddings, no stale RAG.
+        FileMind walks the file tree, follows imports, and cites the exact files it read.
+        Try <strong>Demo</strong> mode to explore FileMind's own code, or <strong>GitHub</strong> mode for any public repo.
       </p>
       <div className="empty-hero__chips">
         {EXAMPLE_PROMPTS.map(p => (

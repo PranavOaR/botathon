@@ -12,9 +12,9 @@ import {
 import type { TargetMode } from '@/lib/types';
 
 const QUICK_CHIPS = [
-  'auth flow?',
-  'where is JWT?',
-  'add RBAC?',
+  'agent loop?',
+  'how tools work?',
+  'SSE streaming?',
 ];
 
 export interface QueryInputProps {
@@ -89,7 +89,7 @@ export default function QueryInput({
               disabled={isRunning}
             >
               <FolderOpen size={11} aria-hidden="true" />
-              Local
+              Demo
             </button>
             <button
               type="button"
@@ -105,18 +105,23 @@ export default function QueryInput({
           </div>
 
           {targetMode === 'local' ? (
-            <div className="repo-input">
-              <FolderOpen size={12} className="repo-input__icon" aria-hidden="true" />
-              <input
-                type="text"
-                className="repo-input__field"
-                value={targetPath}
-                onChange={e => onTargetPathChange(e.target.value)}
-                disabled={isRunning}
-                placeholder="./path/to/repo"
-                spellCheck={false}
-                aria-label="Local repository path"
-              />
+            <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: '2px' }}>
+              <div className="repo-input">
+                <FolderOpen size={12} className="repo-input__icon" aria-hidden="true" />
+                <input
+                  type="text"
+                  className="repo-input__field"
+                  value={targetPath}
+                  onChange={e => onTargetPathChange(e.target.value)}
+                  disabled={isRunning}
+                  placeholder=". (FileMind's own code)"
+                  spellCheck={false}
+                  aria-label="Server-side path"
+                />
+              </div>
+              <span style={{ fontSize: '10px', color: 'var(--text-muted, #666)', paddingLeft: '4px' }}>
+                Server path — use <code>.</code> for FileMind's own code, or switch to GitHub mode for your repo
+              </span>
             </div>
           ) : (
             <div className="repo-input">
@@ -169,11 +174,11 @@ export default function QueryInput({
                 key={chip}
                 type="button"
                 className="composer__inline-chip"
-                onClick={() => onQueryChange(chip === 'auth flow?'
-                  ? 'How does authentication work?'
-                  : chip === 'where is JWT?'
-                  ? 'Where is JWT validation implemented?'
-                  : 'What files would I change to add role-based access?')}
+                onClick={() => onQueryChange(chip === 'agent loop?'
+                  ? 'How does the agent loop work? What files are involved?'
+                  : chip === 'how tools work?'
+                  ? 'How are the tools (tree, read, grep, jump) dispatched?'
+                  : 'How is SSE streaming implemented end to end?')}
                 disabled={isRunning}
               >
                 {chip}
