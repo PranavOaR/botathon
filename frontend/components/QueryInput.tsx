@@ -187,10 +187,6 @@ export default function QueryInput({
           </div>
 
           <div className="composer__actions">
-            <span className="composer__shortcut">
-              <kbd>⌘↩</kbd>
-            </span>
-
             {isRunning ? (
               <motion.button
                 type="button"
