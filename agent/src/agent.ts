@@ -24,6 +24,7 @@ Tool usage rules:
 - Never read a file you haven't seen in the tree or found via grep first
 - Always cite which files and line numbers your answer comes from
 - If you don't know, say "I need to check X first" and use a tool
+- The project root may be the FileMind agent's own source code (src/, package.json, etc.) — that is a valid codebase to explore
 
 Answer format:
 - Lead with a direct answer

@@ -25,10 +25,10 @@ const API_URL = process.env.NEXT_PUBLIC_FILEMIND_API_URL ?? 'http://localhost:30
 type ImportStatus = 'idle' | 'importing' | 'done' | 'error';
 
 const EXAMPLE_PROMPTS = [
-  { label: 'How does authentication work?',         icon: 'shield' as const },
-  { label: 'Where is JWT validation implemented?',  icon: 'search' as const },
-  { label: 'Map the routing structure',             icon: 'tree' as const },
-  { label: 'What files change to add RBAC?',        icon: 'edit' as const },
+  { label: 'How does the agent loop work?',         icon: 'tree' as const },
+  { label: 'Where is the SSE streaming wired up?',  icon: 'search' as const },
+  { label: 'How are tools dispatched?',             icon: 'shield' as const },
+  { label: 'What files handle GitHub import?',      icon: 'edit' as const },
 ];
 
 function ExampleChipIcon({ kind }: { kind: 'shield' | 'search' | 'tree' | 'edit' }) {
@@ -116,7 +116,7 @@ function InlineError({ message }: { message: string }) {
 
 export default function HomePage() {
   const [query, setQuery] = useState('How does authentication work?');
-  const [targetPath, setTargetPath] = useState('../demo/sample-repos/nextjs-starter');
+  const [targetPath, setTargetPath] = useState('.');
   const [targetMode, setTargetMode] = useState<TargetMode>('local');
   const [repoUrl, setRepoUrl] = useState('');
   const [branch, setBranch] = useState('main');
