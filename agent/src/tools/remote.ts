@@ -296,23 +296,27 @@ export async function importRemoteRepo(
   const apifyToken = process.env['APIFY_API_TOKEN']?.trim();
   const actorId = process.env['APIFY_ACTOR_ID']?.trim();
   const useApify = Boolean(apifyToken && actorId);
-  const importMode: 'apify' | 'github_fallback' = useApify ? 'apify' : 'github_fallback';
 
   console.log(
-    `[remote] Importing ${owner}/${repo}@${branch} via ${useApify ? 'Apify' : 'GitHub API (fallback)'}`
+    `[remote] Importing ${owner}/${repo}@${branch} via ${useApify ? 'Apify' : 'GitHub API'}`
   );
 
+  let importMode: 'apify' | 'github_fallback';
   let output: RemoteRepoOutput;
-  try {
-    output = useApify
-      ? await fetchViaApify(repoUrl, branch)
-      : await fetchFromGitHub(owner, repo, branch);
-  } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err);
-    if (!useApify) {
-      throw new Error(`Apify not configured, GitHub fallback failed: ${reason}`);
+
+  if (useApify) {
+    try {
+      output = await fetchViaApify(repoUrl, branch);
+      importMode = 'apify';
+    } catch (apifyErr) {
+      const reason = apifyErr instanceof Error ? apifyErr.message : String(apifyErr);
+      console.warn(`[remote] Apify failed (${reason}), falling back to GitHub API`);
+      output = await fetchFromGitHub(owner, repo, branch);
+      importMode = 'github_fallback';
     }
-    throw err;
+  } else {
+    output = await fetchFromGitHub(owner, repo, branch);
+    importMode = 'github_fallback';
   }
 
   const { written } = writeRepoFiles(output, targetPath);
