@@ -119,7 +119,7 @@ export default function QueryInput({
                   aria-label="Server-side path"
                 />
               </div>
-              <span style={{ fontSize: '10px', color: 'var(--text-muted, #666)', paddingLeft: '4px' }}>
+              <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', paddingLeft: '4px' }}>
                 Server path — use <code>.</code> for FileMind's own code, or switch to GitHub mode for your repo
               </span>
             </div>
