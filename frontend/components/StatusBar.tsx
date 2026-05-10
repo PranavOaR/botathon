@@ -1,45 +1,71 @@
 'use client';
 
+import { Settings2 } from 'lucide-react';
+
 type BackendStatus = 'checking' | 'connected' | 'error';
 
 const STATUS_LABEL: Record<BackendStatus, string> = {
-  checking: 'checking',
+  checking: 'connecting',
   connected: 'connected',
-  error: 'unavailable',
+  error: 'offline',
 };
 
 interface StatusBarProps {
   backendStatus: BackendStatus;
   isRunning: boolean;
   iterationCount: number | null;
+  onOpenIntegrations: () => void;
+  integrationsAlertCount?: number;
 }
 
-export default function StatusBar({ backendStatus, isRunning, iterationCount }: StatusBarProps) {
+export default function StatusBar({
+  backendStatus,
+  isRunning,
+  iterationCount,
+  onOpenIntegrations,
+  integrationsAlertCount = 0,
+}: StatusBarProps) {
   return (
     <header className="topbar">
       <div className="topbar__brand">
-        <div className="topbar__logo">FM</div>
-        <span className="topbar__name">FileMind</span>
-        <div className="topbar__divider" />
-        <span className="topbar__subtitle">Structure-aware codebase investigation</span>
+        <div className="brand-mark" aria-hidden="true">FM</div>
+        <span className="brand-name">FileMind</span>
+        <span className="brand-meta">structure-aware nav</span>
       </div>
 
       <div className="topbar__right">
-        {iterationCount !== null && (
-          <div className="topbar__iter">iter: {iterationCount}</div>
+        {iterationCount !== null && !isRunning && (
+          <span className="iter-pill">
+            <span className="iter-pill__num">{iterationCount}</span> iter
+          </span>
         )}
 
         {isRunning && (
-          <div className="status-pill status-pill--running">
-            <div className="status-pill__dot" />
+          <span className="status-pill status-pill--running" aria-live="polite">
+            <span className="status-pill__dot" />
             investigating
-          </div>
+          </span>
         )}
 
-        <div className={`status-pill status-pill--${backendStatus}`}>
-          <div className="status-pill__dot" />
+        <span className={`status-pill status-pill--${backendStatus}`} aria-live="polite">
+          <span className="status-pill__dot" />
           {STATUS_LABEL[backendStatus]}
-        </div>
+        </span>
+
+        <button
+          type="button"
+          className="topbar-btn"
+          onClick={onOpenIntegrations}
+          aria-label="Open integrations panel"
+        >
+          <Settings2 size={13} aria-hidden="true" />
+          <span>Integrations</span>
+          {integrationsAlertCount > 0 && (
+            <span className="topbar-btn__count" aria-label={`${integrationsAlertCount} alerts`}>
+              {integrationsAlertCount}
+            </span>
+          )}
+        </button>
       </div>
     </header>
   );

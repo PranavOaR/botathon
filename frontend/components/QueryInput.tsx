@@ -1,15 +1,20 @@
 'use client';
 
-import { useCallback, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useRef, type KeyboardEvent } from 'react';
 import { motion } from 'framer-motion';
-import { Send, X, FolderOpen, Globe, GitBranch, Zap } from 'lucide-react';
+import {
+  FolderOpen,
+  Globe,
+  GitBranch,
+  ArrowUp,
+  Square,
+} from 'lucide-react';
 import type { TargetMode } from '@/lib/types';
-import { GlassButton } from '@/components/ui/apple-tahoe-liquid-glass-button';
 
-const EXAMPLES = [
-  'How does authentication work?',
-  'Where is JWT validation implemented?',
-  'What files would I change to add role-based access?',
+const QUICK_CHIPS = [
+  'auth flow?',
+  'where is JWT?',
+  'add RBAC?',
 ];
 
 export interface QueryInputProps {
@@ -43,157 +48,172 @@ export default function QueryInput({
   branch,
   onBranchChange,
 }: QueryInputProps) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-resize textarea
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+  }, [query]);
+
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      // Cmd/Ctrl + Enter or plain Enter (no shift)
+      if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         onSubmit();
       }
     },
-    [onSubmit]
+    [onSubmit],
   );
 
-  const isSubmitDisabled = isRunning || !query.trim() || (
-    targetMode === 'github' ? !repoUrl.trim() : false
-  );
+  const isSubmitDisabled =
+    isRunning ||
+    !query.trim() ||
+    (targetMode === 'github' ? !repoUrl.trim() : !targetPath.trim());
 
   return (
-    <div className="composer">
-      {/* Mode tabs */}
-      <div className="mode-tabs">
-        <button
-          type="button"
-          className={`mode-tab${targetMode === 'local' ? ' mode-tab--active' : ''}`}
-          onClick={() => onTargetModeChange('local')}
-          disabled={isRunning}
-        >
-          <FolderOpen size={11} />
-          Local path
-        </button>
-        <button
-          type="button"
-          className={`mode-tab${targetMode === 'github' ? ' mode-tab--active' : ''}`}
-          onClick={() => onTargetModeChange('github')}
-          disabled={isRunning}
-        >
-          <Globe size={11} />
-          GitHub repo
-        </button>
-      </div>
-
-      {/* Target input row — conditional on mode */}
-      {targetMode === 'local' ? (
-        <div className="composer__path-row">
-          <label className="composer__path-label" htmlFor="target-path">
-            <FolderOpen size={11} />
-            repo
-          </label>
-          <input
-            id="target-path"
-            type="text"
-            className="composer__path-input"
-            value={targetPath}
-            onChange={e => onTargetPathChange(e.target.value)}
-            disabled={isRunning}
-            spellCheck={false}
-          />
-        </div>
-      ) : (
-        <div className="composer__path-row">
-          <label className="composer__path-label" htmlFor="repo-url">
-            <Globe size={11} />
-            url
-          </label>
-          <input
-            id="repo-url"
-            type="url"
-            className="composer__path-input composer__path-input--url"
-            value={repoUrl}
-            onChange={e => onRepoUrlChange(e.target.value)}
-            disabled={isRunning}
-            placeholder="https://github.com/owner/repo"
-            spellCheck={false}
-          />
-          <label className="composer__path-label" htmlFor="repo-branch" style={{ marginLeft: 6 }}>
-            <GitBranch size={11} />
-          </label>
-          <input
-            id="repo-branch"
-            type="text"
-            className="composer__path-input composer__branch-input"
-            value={branch}
-            onChange={e => onBranchChange(e.target.value)}
-            disabled={isRunning}
-            placeholder="main"
-            spellCheck={false}
-          />
-        </div>
-      )}
-
-      {/* Query textarea */}
-      <textarea
-        className="composer__textarea"
-        value={query}
-        onChange={e => onQueryChange(e.target.value)}
-        onKeyDown={handleKeyDown}
-        disabled={isRunning}
-        placeholder="Ask FileMind to investigate this codebase…"
-        rows={3}
-        spellCheck={false}
-      />
-
-      {/* Bottom row */}
-      <div className="composer__bottom">
-        {/* Example prompts */}
-        <div className="composer__examples">
-          {EXAMPLES.map(ex => (
+    <div className="composer-region">
+      <div className="composer">
+        {/* Top row: mode + repo input */}
+        <div className="composer__row-top">
+          <div className="mode-segment" role="tablist" aria-label="Target source">
             <button
-              key={ex}
               type="button"
-              className="composer__example"
-              onClick={() => onQueryChange(ex)}
+              role="tab"
+              aria-selected={targetMode === 'local'}
+              className={`mode-segment__btn${targetMode === 'local' ? ' mode-segment__btn--active' : ''}`}
+              onClick={() => onTargetModeChange('local')}
               disabled={isRunning}
             >
-              {ex.length > 38 ? ex.slice(0, 36) + '…' : ex}
+              <FolderOpen size={11} aria-hidden="true" />
+              Local
             </button>
-          ))}
-        </div>
-
-        {/* Actions */}
-        <div className="composer__actions">
-          <span className="composer__shortcut">⌘↩</span>
-
-          {isRunning ? (
-            <motion.button
+            <button
               type="button"
-              className="btn btn--cancel"
-              onClick={onCancel}
-              initial={{ opacity: 0, scale: 0.92 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.15 }}
+              role="tab"
+              aria-selected={targetMode === 'github'}
+              className={`mode-segment__btn${targetMode === 'github' ? ' mode-segment__btn--active' : ''}`}
+              onClick={() => onTargetModeChange('github')}
+              disabled={isRunning}
             >
-              <X size={13} />
-              Cancel
-            </motion.button>
+              <Globe size={11} aria-hidden="true" />
+              GitHub
+            </button>
+          </div>
+
+          {targetMode === 'local' ? (
+            <div className="repo-input">
+              <FolderOpen size={12} className="repo-input__icon" aria-hidden="true" />
+              <input
+                type="text"
+                className="repo-input__field"
+                value={targetPath}
+                onChange={e => onTargetPathChange(e.target.value)}
+                disabled={isRunning}
+                placeholder="./path/to/repo"
+                spellCheck={false}
+                aria-label="Local repository path"
+              />
+            </div>
           ) : (
-            <GlassButton
-              size="sm"
-              onClick={onSubmit}
-              disabled={isSubmitDisabled}
-              aria-label="Investigate codebase"
-              contentClassName="gap-2"
-            >
-              <Zap className="w-3.5 h-3.5" aria-hidden="true" />
-              <span>Investigate</span>
-              <Send size={12} aria-hidden="true" />
-            </GlassButton>
+            <div className="repo-input">
+              <Globe size={12} className="repo-input__icon" aria-hidden="true" />
+              <input
+                type="url"
+                className="repo-input__field"
+                value={repoUrl}
+                onChange={e => onRepoUrlChange(e.target.value)}
+                disabled={isRunning}
+                placeholder="github.com/owner/repo"
+                spellCheck={false}
+                aria-label="GitHub repository URL"
+              />
+              <span className="repo-input__divider" aria-hidden="true" />
+              <GitBranch size={11} className="repo-input__icon" aria-hidden="true" />
+              <input
+                type="text"
+                className="repo-input__field repo-input--branch"
+                value={branch}
+                onChange={e => onBranchChange(e.target.value)}
+                disabled={isRunning}
+                placeholder="main"
+                spellCheck={false}
+                aria-label="Branch name"
+                style={{ flex: '0 0 auto', width: 60 }}
+              />
+            </div>
           )}
         </div>
-      </div>
 
-      {/* Hint */}
-      <div style={{ marginTop: 7, fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-        FileMind will inspect structure, follow imports, and cite the path it took.
+        {/* Textarea */}
+        <textarea
+          ref={textareaRef}
+          className="composer__textarea"
+          value={query}
+          onChange={e => onQueryChange(e.target.value)}
+          onKeyDown={handleKeyDown}
+          disabled={isRunning}
+          placeholder="Ask FileMind to investigate this codebase…"
+          rows={1}
+          spellCheck={false}
+          aria-label="Investigation question"
+        />
+
+        {/* Bottom row: chips + actions */}
+        <div className="composer__row-bottom">
+          <div className="composer__inline-chips" aria-label="Quick prompts">
+            {QUICK_CHIPS.map(chip => (
+              <button
+                key={chip}
+                type="button"
+                className="composer__inline-chip"
+                onClick={() => onQueryChange(chip === 'auth flow?'
+                  ? 'How does authentication work?'
+                  : chip === 'where is JWT?'
+                  ? 'Where is JWT validation implemented?'
+                  : 'What files would I change to add role-based access?')}
+                disabled={isRunning}
+              >
+                {chip}
+              </button>
+            ))}
+          </div>
+
+          <div className="composer__actions">
+            <span className="composer__shortcut">
+              <kbd>↵</kbd> send
+            </span>
+
+            {isRunning ? (
+              <motion.button
+                type="button"
+                className="btn btn--cancel"
+                onClick={onCancel}
+                initial={{ opacity: 0, scale: 0.92 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.15 }}
+                aria-label="Cancel investigation"
+              >
+                <Square size={11} fill="currentColor" aria-hidden="true" />
+                Stop
+              </motion.button>
+            ) : (
+              <button
+                type="button"
+                className="btn btn--primary"
+                onClick={onSubmit}
+                disabled={isSubmitDisabled}
+                aria-label="Investigate codebase"
+              >
+                <span>Investigate</span>
+                <ArrowUp size={13} aria-hidden="true" />
+              </button>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
