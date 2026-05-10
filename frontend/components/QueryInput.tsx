@@ -2,8 +2,9 @@
 
 import { useCallback, type KeyboardEvent } from 'react';
 import { motion } from 'framer-motion';
-import { Send, X, FolderOpen, Globe, GitBranch } from 'lucide-react';
+import { Send, X, FolderOpen, Globe, GitBranch, Zap } from 'lucide-react';
 import type { TargetMode } from '@/lib/types';
+import { GlassButton } from '@/components/ui/apple-tahoe-liquid-glass-button';
 
 const EXAMPLES = [
   'How does authentication work?',
@@ -175,18 +176,17 @@ export default function QueryInput({
               Cancel
             </motion.button>
           ) : (
-            <motion.button
-              type="button"
-              className="btn btn--primary"
+            <GlassButton
+              size="sm"
               onClick={onSubmit}
               disabled={isSubmitDisabled}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.97 }}
-              transition={{ duration: 0.1 }}
+              aria-label="Investigate codebase"
+              contentClassName="gap-2"
             >
-              <Send size={13} />
-              Investigate
-            </motion.button>
+              <Zap className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Investigate</span>
+              <Send size={12} aria-hidden="true" />
+            </GlassButton>
           )}
         </div>
       </div>

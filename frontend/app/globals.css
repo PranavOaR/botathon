@@ -1,5 +1,36 @@
 /* FileMind — Investigation Cockpit Design System */
 
+/* Tailwind utility layer — preflight is disabled in tailwind.config.ts so
+   the FileMind reset below remains authoritative. Only utility classes are
+   emitted, used opt-in by shadcn-style components in components/ui/. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* === shadcn HSL tokens (mapped to FileMind palette) === */
+:root {
+  --background-hsl: 222 14% 5%;
+  --foreground-hsl: 222 14% 89%;
+  --border-hsl: 226 13% 14%;
+  --input-hsl: 226 13% 14%;
+  --ring-hsl: 226 13% 28%;
+  --primary-hsl: 192 100% 17%;
+  --primary-foreground-hsl: 0 0% 100%;
+  --secondary-hsl: 226 13% 12%;
+  --secondary-foreground-hsl: 222 14% 89%;
+  --destructive-hsl: 0 84% 60%;
+  --destructive-foreground-hsl: 0 0% 100%;
+  --muted-hsl: 226 13% 10%;
+  --muted-foreground-hsl: 222 9% 54%;
+  --accent-hsl: 226 13% 12%;
+  --accent-foreground-hsl: 222 14% 89%;
+  --popover-hsl: 222 16% 9%;
+  --popover-foreground-hsl: 222 14% 89%;
+  /* CSS-vars used by GlassButton's color-mix expressions */
+  --foreground: oklch(0.92 0.01 240);
+  --background: oklch(0.05 0.01 240);
+}
+
 /* === CSS Variables === */
 :root {
   --bg-void: #090a0c;
