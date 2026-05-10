@@ -10,6 +10,7 @@ export interface ImportResult {
   fileCount: number;
   owner: string;
   repo: string;
+  importMode: 'apify' | 'github_fallback';
 }
 
 interface RemoteFileRecord {
@@ -295,14 +296,24 @@ export async function importRemoteRepo(
   const apifyToken = process.env['APIFY_API_TOKEN'];
   const actorId = process.env['APIFY_ACTOR_ID'];
   const useApify = Boolean(apifyToken && actorId);
+  const importMode: 'apify' | 'github_fallback' = useApify ? 'apify' : 'github_fallback';
 
   console.log(
-    `[remote] Importing ${owner}/${repo}@${branch} via ${useApify ? 'Apify' : 'GitHub API'}`
+    `[remote] Importing ${owner}/${repo}@${branch} via ${useApify ? 'Apify' : 'GitHub API (fallback)'}`
   );
 
-  const output = useApify
-    ? await fetchViaApify(repoUrl, branch)
-    : await fetchFromGitHub(owner, repo, branch);
+  let output: RemoteRepoOutput;
+  try {
+    output = useApify
+      ? await fetchViaApify(repoUrl, branch)
+      : await fetchFromGitHub(owner, repo, branch);
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    if (!useApify) {
+      throw new Error(`Apify not configured, GitHub fallback failed: ${reason}`);
+    }
+    throw err;
+  }
 
   const { written } = writeRepoFiles(output, targetPath);
 
@@ -318,5 +329,6 @@ export async function importRemoteRepo(
     fileCount: written,
     owner,
     repo,
+    importMode,
   };
 }

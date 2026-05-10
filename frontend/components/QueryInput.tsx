@@ -142,7 +142,6 @@ export default function QueryInput({
                 placeholder="main"
                 spellCheck={false}
                 aria-label="Branch name"
-                style={{ flex: '0 0 auto', width: 60 }}
               />
             </div>
           )}
@@ -184,7 +183,7 @@ export default function QueryInput({
 
           <div className="composer__actions">
             <span className="composer__shortcut">
-              <kbd>↵</kbd> send
+              <kbd>⌘↩</kbd>
             </span>
 
             {isRunning ? (

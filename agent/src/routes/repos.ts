@@ -48,6 +48,7 @@ export function createReposRouter(): Router {
         fileCount: result.fileCount,
         owner: result.owner,
         repo: result.repo,
+        importMode: result.importMode,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to import repository';

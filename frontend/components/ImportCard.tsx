@@ -9,6 +9,7 @@ interface ImportCardProps {
   state: ImportState;
   repoUrl: string;
   message?: string | null;
+  importMode?: 'apify' | 'github_fallback';
 }
 
 const META: Record<ImportState, { label: string; modifier: string }> = {
@@ -23,9 +24,15 @@ function StateIcon({ state }: { state: ImportState }) {
   return <XCircle size={16} aria-hidden="true" />;
 }
 
-export default function ImportCard({ state, repoUrl, message }: ImportCardProps) {
+const IMPORT_MODE_LABEL: Record<'apify' | 'github_fallback', string> = {
+  apify: 'via Apify',
+  github_fallback: 'via GitHub API',
+};
+
+export default function ImportCard({ state, repoUrl, message, importMode }: ImportCardProps) {
   const meta = META[state];
-  const detail = message ?? repoUrl;
+  const modeLabel = state === 'done' && importMode ? ` — ${IMPORT_MODE_LABEL[importMode]}` : '';
+  const detail = message ? `${message}${modeLabel}` : repoUrl;
 
   return (
     <motion.div

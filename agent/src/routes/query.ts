@@ -4,6 +4,7 @@ import { FileMindAgent } from '../agent';
 import { QueryBodySchema, StreamQuerySchema } from './schemas';
 import { saveCompletedSession } from './sessionStore';
 import { emitInvestigationCompleted, extractRepoUrl } from '../workflows/superplane';
+import type { SuperplaneEmitResult } from '../workflows/superplane';
 import type { AgentEvent, AgentResponse } from '../types';
 
 export interface AgentRunner {
@@ -90,10 +91,11 @@ export function createQueryRouter(agentRunner: AgentRunner = createDefaultAgentR
       writeSse(res, event);
     };
 
+    let superplaneStatus: SuperplaneEmitResult = 'disabled';
     try {
       const response = await agentRunner.run(query, targetPath, onEvent);
       saveCompletedSession(response);
-      emitInvestigationCompleted({
+      superplaneStatus = await emitInvestigationCompleted({
         sessionId: response.sessionId,
         query,
         targetPath,
@@ -101,11 +103,13 @@ export function createQueryRouter(agentRunner: AgentRunner = createDefaultAgentR
         filesRead: response.filesRead,
         iterationCount: response.iterationCount,
         timestamp: new Date().toISOString(),
-      }).catch(console.warn);
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Agent error';
       writeSse(res, { type: 'error', error: message });
     }
+
+    writeSse(res, { type: 'superplane', status: superplaneStatus });
 
     if (!res.writableEnded) {
       res.end();

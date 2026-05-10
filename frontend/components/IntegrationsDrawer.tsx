@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X,
@@ -26,6 +26,7 @@ interface IntegrationsDrawerProps {
   backendStatus: BackendStatus;
   integrations: IntegrationStatus;
   zyndPaymentInfo: ZyndPaymentInfo | null;
+  triggerRef?: React.RefObject<HTMLButtonElement | null>;
 }
 
 const APIFY_LABEL: Record<ApifyStatus, string> = {
@@ -123,7 +124,10 @@ export default function IntegrationsDrawer({
   backendStatus,
   integrations,
   zyndPaymentInfo,
+  triggerRef,
 }: IntegrationsDrawerProps) {
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
+
   // ESC to close
   useEffect(() => {
     if (!open) return;
@@ -133,6 +137,19 @@ export default function IntegrationsDrawer({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
+
+  // Focus management: focus close button on open, return focus to trigger on close
+  useEffect(() => {
+    if (open) {
+      // Defer to next frame so the drawer has mounted
+      const id = requestAnimationFrame(() => {
+        closeBtnRef.current?.focus();
+      });
+      return () => cancelAnimationFrame(id);
+    }
+    // On close, return focus to the trigger that opened the drawer
+    triggerRef?.current?.focus();
+  }, [open, triggerRef]);
 
   return (
     <AnimatePresence>
@@ -162,6 +179,7 @@ export default function IntegrationsDrawer({
             <div className="drawer__header">
               <div className="drawer__title">Integrations</div>
               <button
+                ref={closeBtnRef}
                 type="button"
                 className="drawer__close"
                 onClick={onClose}

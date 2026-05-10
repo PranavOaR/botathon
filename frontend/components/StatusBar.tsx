@@ -16,6 +16,7 @@ interface StatusBarProps {
   iterationCount: number | null;
   onOpenIntegrations: () => void;
   integrationsAlertCount?: number;
+  integrationsButtonRef?: React.RefObject<HTMLButtonElement | null>;
 }
 
 export default function StatusBar({
@@ -24,6 +25,7 @@ export default function StatusBar({
   iterationCount,
   onOpenIntegrations,
   integrationsAlertCount = 0,
+  integrationsButtonRef,
 }: StatusBarProps) {
   return (
     <header className="topbar">
@@ -53,6 +55,7 @@ export default function StatusBar({
         </span>
 
         <button
+          ref={integrationsButtonRef}
           type="button"
           className="topbar-btn"
           onClick={onOpenIntegrations}

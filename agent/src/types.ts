@@ -33,13 +33,14 @@ export interface ToolOutput {
 }
 
 export interface AgentEvent {
-  type: 'tool_call' | 'tool_result' | 'final' | 'done' | 'error';
+  type: 'tool_call' | 'tool_result' | 'final' | 'done' | 'error' | 'superplane';
   tool?: string;
   input?: Record<string, unknown>;
   summary?: string;
   content?: string;
   iterationCount?: number;
   error?: string;
+  status?: string;
 }
 
 export interface AgentResponse {

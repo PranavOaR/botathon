@@ -91,7 +91,7 @@ function Step({ event, index, isActive }: StepProps) {
       className={cls}
       initial={{ opacity: 0, x: -6, scale: 0.98 }}
       animate={{ opacity: 1, x: 0, scale: 1 }}
-      transition={{ duration: 0.24, delay: 0, ease: [0.16, 1, 0.3, 1] }}
+      transition={{ duration: 0.24, delay: index * 0.06, ease: [0.16, 1, 0.3, 1] }}
     >
       <div className="step__icon">
         <Icon size={14} aria-hidden={true} />
@@ -145,13 +145,24 @@ export default function InvestigationCard({ events, isRunning }: InvestigationCa
         <AnimatePresence initial={false}>
           {visibleEvents.map((event, i) => (
             <Step
-              key={i}
+              key={`${event.type}-${event.tool ?? 'unknown'}-${i}`}
               event={event}
               index={i}
               isActive={isRunning && i === visibleEvents.length - 1}
             />
           ))}
         </AnimatePresence>
+        {!isRunning && visibleEvents.length > 0 && (
+          <motion.div
+            className="steps-terminal"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2 }}
+          >
+            <CheckCircle2 size={11} />
+            Synthesized — see answer below
+          </motion.div>
+        )}
       </div>
     </motion.div>
   );

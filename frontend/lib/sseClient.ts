@@ -1,13 +1,14 @@
 import type { ZyndPaymentInfo } from '@/lib/types';
 
 export interface AgentEvent {
-  type: 'tool_call' | 'tool_result' | 'final' | 'done' | 'error';
+  type: 'tool_call' | 'tool_result' | 'final' | 'done' | 'error' | 'superplane';
   tool?: string;
   input?: Record<string, unknown>;
   summary?: string;
   content?: string;
   iterationCount?: number;
   error?: string;
+  status?: string;
 }
 
 export interface StreamQueryOptions {
@@ -20,6 +21,7 @@ export interface StreamQueryOptions {
   onClose?: () => void;
   onPaymentRequired?: (info: ZyndPaymentInfo) => void;
   onServiceUnavailable?: (message: string) => void;
+  paymentHeader?: { name: string; value: string };
 }
 
 export function streamQuery(options: StreamQueryOptions): { close: () => void } {
@@ -33,6 +35,7 @@ export function streamQuery(options: StreamQueryOptions): { close: () => void } 
     onClose,
     onPaymentRequired,
     onServiceUnavailable,
+    paymentHeader,
   } = options;
 
   const params = new URLSearchParams({ query, targetPath });
@@ -44,10 +47,15 @@ export function streamQuery(options: StreamQueryOptions): { close: () => void } 
   async function run() {
     let response: Response;
 
+    const fetchHeaders: Record<string, string> = { Accept: 'text/event-stream' };
+    if (paymentHeader) {
+      fetchHeaders[paymentHeader.name] = paymentHeader.value;
+    }
+
     try {
       response = await fetch(url, {
         signal: controller.signal,
-        headers: { Accept: 'text/event-stream' },
+        headers: fetchHeaders,
       });
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') return;
@@ -131,12 +139,6 @@ export function streamQuery(options: StreamQueryOptions): { close: () => void } 
             completed = true;
           }
           onEvent(parsed);
-
-          if (completed) {
-            reader.cancel();
-            onClose?.();
-            return;
-          }
         }
       }
 

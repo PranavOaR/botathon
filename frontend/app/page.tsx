@@ -8,6 +8,7 @@ import type { AgentEvent } from '@/lib/sseClient';
 import type {
   TargetMode,
   IntegrationStatus,
+  SuperplaneStatus,
   ZyndPaymentInfo,
   BackendIntegrationsStatus,
 } from '@/lib/types';
@@ -119,6 +120,7 @@ export default function HomePage() {
   const [submittedQuery, setSubmittedQuery] = useState<string | null>(null);
   const [importStatus, setImportStatus] = useState<ImportStatus>('idle');
   const [importMessage, setImportMessage] = useState<string | null>(null);
+  const [importMode, setImportMode] = useState<'apify' | 'github_fallback' | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [integrations, setIntegrations] = useState<IntegrationStatus>({
     apify: 'unknown',
@@ -130,6 +132,7 @@ export default function HomePage() {
   const streamRef = useRef<{ close: () => void } | null>(null);
   const feedRef = useRef<HTMLDivElement>(null);
   const backendSuperplaneEnabled = useRef(false);
+  const integrationsButtonRef = useRef<HTMLButtonElement | null>(null);
 
   // Health check
   useEffect(() => {
@@ -179,12 +182,14 @@ export default function HomePage() {
     el.scrollTop = el.scrollHeight;
   }, [events.length, importStatus, answer, submittedQuery]);
 
-  // Sync apify badge
+  // Sync apify badge — when user switches to GitHub mode, surface a status if it's still unknown.
+  // Use functional setState so we don't need integrations.apify in the dep array.
   useEffect(() => {
-    if (targetMode === 'github' && integrations.apify === 'unknown') {
-      setIntegrations(prev => ({ ...prev, apify: 'not_configured' }));
-    }
-  }, [targetMode]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (targetMode !== 'github') return;
+    setIntegrations(prev =>
+      prev.apify === 'unknown' ? { ...prev, apify: 'not_configured' } : prev,
+    );
+  }, [targetMode]);
 
   const buildEventHandlers = useCallback(() => ({
     onEvent(event: AgentEvent) {
@@ -193,8 +198,17 @@ export default function HomePage() {
       if (event.type === 'done') {
         setIterationCount(event.iterationCount ?? null);
         setIsRunning(false);
-        if (backendSuperplaneEnabled.current) {
-          setIntegrations(prev => ({ ...prev, superplane: 'event_emitted' }));
+      }
+      if (event.type === 'superplane' && event.status) {
+        const statusMap: Record<string, SuperplaneStatus> = {
+          emitted: 'event_emitted',
+          failed: 'event_failed',
+          disabled: 'disabled',
+          not_configured: 'disabled',
+        };
+        const mapped = statusMap[event.status];
+        if (mapped) {
+          setIntegrations(prev => ({ ...prev, superplane: mapped }));
         }
       }
       if (event.type === 'error') {
@@ -232,6 +246,7 @@ export default function HomePage() {
     setSubmittedQuery(query.trim());
     setImportStatus('idle');
     setImportMessage(null);
+    setImportMode(null);
     setIntegrations(prev => ({
       ...prev,
       superplane: backendSuperplaneEnabled.current ? 'pending' : 'disabled',
@@ -260,6 +275,7 @@ export default function HomePage() {
     setSubmittedQuery(query.trim());
     setImportStatus('importing');
     setImportMessage(null);
+    setImportMode(null);
     setIntegrations(prev => ({
       ...prev,
       apify: 'importing',
@@ -296,6 +312,7 @@ export default function HomePage() {
         repoUrl?: string;
         branch?: string;
         fileCount?: number;
+        importMode?: 'apify' | 'github_fallback';
         error?: string;
       };
 
@@ -316,9 +333,11 @@ export default function HomePage() {
       const fileCount = data.fileCount ?? 0;
       const importedPath = data.targetPath ?? '';
       const importedRepo = data.repoUrl ?? repoUrl.trim();
+      const resolvedImportMode = data.importMode ?? null;
 
       setImportStatus('done');
       setImportMessage(`${fileCount} files from ${importedRepo}`);
+      setImportMode(resolvedImportMode);
       setIntegrations(prev => ({ ...prev, apify: 'imported' }));
 
       setIsRunning(true);
@@ -363,6 +382,7 @@ export default function HomePage() {
         iterationCount={iterationCount}
         onOpenIntegrations={() => setDrawerOpen(true)}
         integrationsAlertCount={integrationsAlertCount}
+        integrationsButtonRef={integrationsButtonRef}
       />
 
       <div className="chat-shell">
@@ -376,7 +396,7 @@ export default function HomePage() {
                   <ImportCard key="imp-importing" state="importing" repoUrl={repoUrl} />
                 )}
                 {showImportCard && importStatus === 'done' && importMessage && (
-                  <ImportCard key="imp-done" state="done" repoUrl={repoUrl} message={importMessage} />
+                  <ImportCard key="imp-done" state="done" repoUrl={repoUrl} message={importMessage} importMode={importMode ?? undefined} />
                 )}
                 {showImportCard && importStatus === 'error' && importMessage && (
                   <ImportCard key="imp-error" state="error" repoUrl={repoUrl} message={importMessage} />
@@ -424,6 +444,7 @@ export default function HomePage() {
         backendStatus={backendStatus}
         integrations={integrations}
         zyndPaymentInfo={zyndPaymentInfo}
+        triggerRef={integrationsButtonRef}
       />
     </div>
   );

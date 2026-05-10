@@ -32,6 +32,10 @@ function renderInline(text: string): ReactNode[] {
   return parts;
 }
 
+const UL_RE = /^(\s*)([-*])\s+(.*)$/;
+const OL_RE = /^(\s*)(\d+)\.\s+(.*)$/;
+const BQ_RE = /^>\s?(.*)$/;
+
 function renderMarkdown(text: string): ReactNode[] {
   const out: ReactNode[] = [];
   const lines = text.split('\n');
@@ -65,6 +69,65 @@ function renderMarkdown(text: string): ReactNode[] {
     if (line.startsWith('## ')) {
       out.push(<h2 key={key++}>{line.slice(3)}</h2>);
       i += 1;
+      continue;
+    }
+
+    // Unordered list — group consecutive `- ` / `* ` lines
+    const ulMatch = line.match(UL_RE);
+    if (ulMatch) {
+      const items: string[] = [ulMatch[3]];
+      i += 1;
+      while (i < lines.length) {
+        const next = lines[i].match(UL_RE);
+        if (!next) break;
+        items.push(next[3]);
+        i += 1;
+      }
+      out.push(
+        <ul key={key++}>
+          {items.map((item, idx) => (
+            <li key={idx}>{renderInline(item)}</li>
+          ))}
+        </ul>,
+      );
+      continue;
+    }
+
+    // Ordered list — group consecutive `1. ` / `2. ` lines
+    const olMatch = line.match(OL_RE);
+    if (olMatch) {
+      const items: string[] = [olMatch[3]];
+      i += 1;
+      while (i < lines.length) {
+        const next = lines[i].match(OL_RE);
+        if (!next) break;
+        items.push(next[3]);
+        i += 1;
+      }
+      out.push(
+        <ol key={key++}>
+          {items.map((item, idx) => (
+            <li key={idx}>{renderInline(item)}</li>
+          ))}
+        </ol>,
+      );
+      continue;
+    }
+
+    // Blockquote — group consecutive `> ` lines
+    const bqMatch = line.match(BQ_RE);
+    if (bqMatch) {
+      const quoteLines: string[] = [bqMatch[1]];
+      i += 1;
+      while (i < lines.length) {
+        const next = lines[i].match(BQ_RE);
+        if (!next) break;
+        quoteLines.push(next[1]);
+        i += 1;
+      }
+      out.push(
+        <blockquote key={key++}>{renderInline(quoteLines.join(' '))}</blockquote>,
+      );
       continue;
     }
 

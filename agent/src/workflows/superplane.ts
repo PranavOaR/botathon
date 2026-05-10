@@ -1,5 +1,7 @@
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+export type SuperplaneEmitResult = 'emitted' | 'failed' | 'disabled' | 'not_configured';
+
 export interface InvestigationPayload {
   sessionId: string;
   query: string;
@@ -38,18 +40,18 @@ function getSuperplaneConfig(): {
 /**
  * Emits a `filemind.investigation.completed` event to Superplane.
  *
- * Fire-and-forget: never throws. Callers should use .catch(console.warn).
+ * Never throws. Returns a result indicating what happened.
  * Feature-flagged via SUPERPLANE_ENABLED env var.
  *
  * TODO: Adjust request body shape once official Superplane API is confirmed.
  */
 export async function emitInvestigationCompleted(
   payload: InvestigationPayload
-): Promise<void> {
+): Promise<SuperplaneEmitResult> {
   const config = getSuperplaneConfig();
 
   if (!config.enabled) {
-    return;
+    return 'disabled';
   }
 
   if (!config.apiToken || !config.canvasId) {
@@ -57,7 +59,7 @@ export async function emitInvestigationCompleted(
       '[superplane] SUPERPLANE_API_TOKEN and SUPERPLANE_CANVAS_ID must be set ' +
       'when SUPERPLANE_ENABLED=true — skipping event emit'
     );
-    return;
+    return 'not_configured';
   }
 
   const event: SuperplaneEvent = {
@@ -81,12 +83,15 @@ export async function emitInvestigationCompleted(
       console.warn(
         `[superplane] Event emit failed (${res.status}): ${body}`
       );
-    } else {
-      console.log(`[superplane] Emitted investigation.completed for session ${payload.sessionId}`);
+      return 'failed';
     }
+
+    console.log(`[superplane] Emitted investigation.completed for session ${payload.sessionId}`);
+    return 'emitted';
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.warn(`[superplane] Network error emitting event: ${message}`);
+    return 'failed';
   }
 }
 

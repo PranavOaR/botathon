@@ -592,7 +592,6 @@ input, textarea { font: inherit; color: inherit; }
   gap: 6px;
   font-size: 11px;
   font-family: var(--font-mono);
-  color: var(--text-tertiary);
   padding: 3px 9px;
   border-radius: 999px;
   background: var(--success-soft);
@@ -741,6 +740,21 @@ input, textarea { font: inherit; color: inherit; }
   padding-left: 0;
 }
 
+.steps-terminal {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--success);
+  margin-top: 8px;
+  padding: 3px 9px;
+  background: var(--success-soft);
+  border: 1px solid var(--success-border);
+  border-radius: 999px;
+  align-self: flex-start;
+}
+
 /* =============================================
    ANSWER BODY (markdown)
    ============================================= */
@@ -807,6 +821,10 @@ input, textarea { font: inherit; color: inherit; }
 
 .answer-body pre::-webkit-scrollbar { height: 6px; }
 .answer-body pre::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 999px; }
+
+.answer-body ul, .answer-body ol { margin: 6px 0 10px 16px; }
+.answer-body li { margin-bottom: 3px; line-height: 1.6; }
+.answer-body blockquote { border-left: 2px solid var(--border-strong); padding-left: 10px; color: var(--text-secondary); margin: 8px 0; }
 
 /* =============================================
    EVIDENCE SECTION (file chips)
@@ -1074,7 +1092,7 @@ input, textarea { font: inherit; color: inherit; }
 
 .repo-input--branch {
   flex: 0 0 auto;
-  width: 110px;
+  width: 70px;
   padding-left: 9px;
   padding-right: 9px;
 }
