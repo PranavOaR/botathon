@@ -1,5 +1,7 @@
 # FileMind
 
+**Live demo:** https://botathon-nine.vercel.app/
+
 FileMind is a structure-aware codebase investigation agent built for Botathon 2026. Instead of pre-indexing files into vector embeddings, it navigates codebases on demand using primitive tools — tree, read, grep, jump, summarize — the same way a senior developer would. Every step is auditable. There are no stale embeddings, no black-box similarity scores, and no guesses about what a file contains.
 
 ---
